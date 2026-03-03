@@ -1,0 +1,271 @@
+---
+title: Data Center Management (DCIM)
+description: Visualize and manage your data center infrastructure with rack layouts, power tracking, and comprehensive asset placement
+---
+
+Ralph's Data Center Infrastructure Management (DCIM) features provide complete visibility into your physical infrastructure with graphical rack layouts, server room visualization, and detailed asset tracking.
+
+## Overview
+
+The DCIM module helps you:
+
+- Visualize data center layouts with interactive floor plans
+- Manage racks with front/back views and U-level positioning
+- Track connections, power, and network infrastructure
+- Plan capacity and optimize space utilization
+- Document physical infrastructure relationships
+
+<CardGroup cols={2}>
+  <Card title="DC Visualization" icon="map">
+    Interactive floor plans with drag-and-drop rack placement and orientation controls
+  </Card>
+  
+  <Card title="Rack Inspector" icon="server">
+    Detailed front and back rack views showing exact asset positioning
+  </Card>
+  
+  <Card title="Server Rooms" icon="building">
+    Organize racks into server rooms with customizable grid layouts
+  </Card>
+  
+  <Card title="Accessories" icon="plug">
+    Track patch panels, PDUs, brushes, and other rack-mounted accessories
+  </Card>
+</CardGroup>
+
+## Data Center Hierarchy
+
+Ralph organizes physical infrastructure in a clear hierarchy:
+
+```
+Data Center
+└── Server Room
+    └── Rack
+        ├── Assets (positioned at U-levels)
+        └── Accessories
+```
+
+### Data Centers
+
+Top-level containers representing physical facilities:
+
+- Define grid size (columns and rows)
+- Visualize all server rooms and racks
+- Plan capacity and growth
+
+### Server Rooms
+
+Logical divisions within data centers:
+
+- Group related racks together
+- Track room-level infrastructure
+- Organize by function or network zones
+
+### Racks
+
+Physical rack units with detailed tracking:
+
+- Standard 42U or custom heights
+- Position on DC floor plan
+- Orientation (front-facing direction)
+- Visual status indicators
+
+## DC Visualization
+
+### Interactive Floor Plan
+
+The DC visualization provides a bird's-eye view of your infrastructure:
+
+**View Mode**
+- See all racks positioned on the floor
+- Color-coded status indicators
+- Click racks to open the inspector
+- Navigate between server rooms
+
+**Edit Mode**
+- Drag racks to new positions
+- Rotate racks using the rotate button
+- Rename racks with the pencil icon
+- Add new racks with the plus cursor
+- Adjust grid size for expansion
+
+<Tip>
+Use Edit mode to quickly add multiple racks at once. Click on empty grid spaces to create racks, then configure each one individually.
+</Tip>
+
+### Rack Inspector
+
+Click any rack to open the detailed inspector view:
+
+- **Front View** - See all front-mounted equipment
+- **Back View** - See all rear-mounted equipment
+- **U-Level Display** - Exact positioning from bottom to top
+- **Asset Details** - Click assets to edit or view details
+- **Free Space** - Identify available positions
+
+<Note>
+The Rack Inspector shows both sides simultaneously, making it easy to plan cable management and identify rear-mounted equipment like PDUs.
+</Note>
+
+## Asset Positioning
+
+### U-Level Placement
+
+Position assets precisely within racks:
+
+- **Position** - U-level from bottom (1-42)
+- **Height** - Number of U-levels the asset occupies
+- **Orientation** - Front, back, left, or right mounting
+- **Depth** - Full-depth or half-depth equipment
+
+<Tip>
+For rack-mounted accessories like PDUs or brushes that don't occupy a full U, set the position to 0. This displays them separately without consuming rack space.
+</Tip>
+
+### Slots for Blade Systems
+
+Blade chassis can contain multiple blade servers:
+
+- **Chassis** - Positioned at a specific U-level
+- **Blades** - Occupy numbered slots within the chassis
+- **Slot Format** - Numbers 1-16 with optional A/B suffix
+- **Visualization** - Blades shown within parent chassis
+
+Define the number of slots in the Model settings using "layout of front/back size" fields.
+
+## Rack Accessories
+
+Track non-asset items mounted in racks:
+
+- **Patch Panels** - Fiber Channel or UTP
+- **PDUs** - Power distribution units
+- **Brushes** - Cable management
+- **Organizers** - Cable organizers
+- **Power Sockets** - Additional outlets
+
+Accessories can be positioned at specific U-levels or marked as position 0 for general rack items.
+
+## Network Configuration
+
+### IP Address Management
+
+Integrate physical assets with network infrastructure:
+
+- Assign IP addresses to data center assets
+- Link to network environments (production, management, etc.)
+- Track DNS records and hostnames
+- DHCP configuration integration
+
+### Management Interfaces
+
+Track out-of-band management:
+
+- **Management IP** - iLO, iDRAC, IPMI addresses
+- **Management Username** - Access credentials
+- **KVM Switch** - Physical console connections
+- **Connection Type** - SSH, HTTPS, VNC
+
+## Configuration Management
+
+### Configuration Path
+
+Ralph integrates with configuration management tools like Puppet and Ansible:
+
+1. **Define Configuration Modules** - Hierarchical configuration groupings
+2. **Create Configuration Classes** - Specific configurations or playbooks
+3. **Assign to Assets** - Link configurations via the configuration_path field
+4. **API Integration** - Fetch configuration_path from Ralph API
+5. **Apply Configs** - Use in your CM tool automation
+
+<Note>
+Configuration modules map directly to Puppet modules or Ansible playbooks. Use custom fields marked as "configuration variables" to pass parameters to your automation.
+</Note>
+
+Example: Set configuration_path to `ralph/www` for a web server, then fetch variables via API:
+
+```json
+{
+  "configuration_path": "ralph/www",
+  "configuration_variables": {
+    "monitoring": "zabbix",
+    "backup_enabled": true
+  }
+}
+```
+
+See [DCIM Configuration](/user-guide/dcim) for detailed setup.
+
+## Connections
+
+Document physical and logical connections:
+
+- **Ethernet Connections** - Network cables between assets
+- **Fiber Connections** - Fiber optic links
+- **Power Connections** - PDU to asset power mapping
+- **Connection Types** - Document cable categories and speeds
+
+## Capacity Planning
+
+### Space Management
+
+- View available U-levels in each rack
+- Identify racks nearing capacity
+- Plan equipment moves and consolidation
+- Optimize rack space utilization
+
+### Power Tracking
+
+- Record power consumption per asset
+- Calculate total rack power draw
+- Monitor PDU capacity
+- Plan power infrastructure upgrades
+
+## Asset Details
+
+Data center assets include all standard asset properties plus:
+
+- **Position & Slot** - Physical location in rack
+- **Parent** - Blade chassis or other parent device
+- **Management IP** - Out-of-band management interface
+- **Firmware Version** - BIOS/firmware tracking
+- **Connections** - Network and power links
+- **Configuration Path** - CM tool integration
+
+## Best Practices
+
+<Tip>
+**Start with Structure**: Set up your Data Centers, Server Rooms, and Racks first. Then populate with assets. This makes visualization and reporting much more useful.
+</Tip>
+
+<Tip>
+**Use Consistent Naming**: Adopt naming conventions for racks (e.g., DC1-R01, DC1-R02) to make them easy to locate and reference.
+</Tip>
+
+<Tip>
+**Document Connections**: Record network and power connections as you deploy equipment. This documentation is invaluable during troubleshooting and maintenance.
+</Tip>
+
+<Note>
+Keep rack orientation consistent within each server room. This makes the DC visualization more intuitive and easier to navigate.
+</Note>
+
+## Integration with Other Modules
+
+### Assets
+Data center assets are a specialized type of asset with location properties. All asset management features apply.
+
+### Licenses
+Assign software licenses to data center assets for compliance tracking.
+
+### Supports
+Link vendor support contracts to specific hardware for SLA management.
+
+### Workflows
+Use transitions to automate deployment, decommissioning, and rack changes.
+
+### Reports
+Generate capacity reports, power consumption summaries, and asset inventories by location.
+
+<Card title="Next Steps" icon="arrow-right">
+  Explore asset lifecycle automation with [Workflows & Transitions](/features/workflows)
+</Card>

@@ -1,0 +1,341 @@
+---
+title: Custom Fields
+description: Extend Ralph models with custom fields to store additional data
+---
+
+Ralph's custom fields feature allows you to attach additional data fields to any model, providing flexibility to store information specific to your organization.
+
+## Overview
+
+Custom fields provide:
+
+- **Flexible data storage** - Attach to any Ralph model
+- **Type validation** - String, integer, date, URL, or choice list
+- **API integration** - Accessible via REST API
+- **Configuration variables** - Export to configuration management tools
+- **Choice constraints** - Define allowed values
+
+## Defining Custom Fields
+
+<Steps>
+  <Step title="Navigate to Custom Fields">
+    Go to **Settings → Custom fields** or visit `/custom_fields/customfield/`
+  </Step>
+  
+  <Step title="Create New Field">
+    Click **Add custom field** to create a new one.
+  </Step>
+  
+  <Step title="Configure the Field">
+    Fill in the required information (see configuration options below).
+  </Step>
+  
+  <Step title="Save">
+    Click **Save** to create the custom field.
+  </Step>
+</Steps>
+
+## Configuration Options
+
+### Basic Settings
+
+**Name**
+- The display name shown in the UI
+- Can contain spaces and special characters
+
+**Attribute Name**
+- Slugified version of the name
+- Used as the key in API responses
+- Automatically generated from name
+- Example: "Docker Version" → `docker_version`
+
+### Field Types
+
+**String**
+- Free-form text input
+- No validation applied
+
+**Integer**
+- Numeric values only
+- Validates that input is a whole number
+
+**Date**
+- Date picker in UI
+- Stored in YYYY-MM-DD format
+
+**URL**
+- Validates that input is a valid URL
+- Example: `https://example.com/manual.pdf`
+
+**Choice List**
+- Dropdown with predefined options
+- Requires configuring the **Choices** field
+
+### Choices Configuration
+
+For **choice list** type, define options separated by `|`:
+
+```
+abc|def|ghi
+```
+
+Users will select from these predefined values.
+
+### Default Value
+
+Optionally set a default value that will be used when the field is first attached to an object.
+
+### Configuration Variable
+
+Check **"use as configuration variable"** to:
+- Expose the field in the API's `configuration_variables` field
+- Use with Puppet, Ansible, or other automation tools
+- Separate configuration data from general custom fields
+
+## Example Custom Field
+
+Creating a "Monitoring System" field:
+
+- **Name**: Monitoring System
+- **Attribute name**: `monitoring_system` (auto-generated)
+- **Type**: Choice list
+- **Choices**: `zabbix|nagios|prometheus`
+- **Default value**: `zabbix`
+- **Use as configuration variable**: ✓ Checked
+
+## Attaching Custom Fields to Objects
+
+<Steps>
+  <Step title="Open Object Editor">
+    Navigate to any asset or object you want to add custom fields to.
+  </Step>
+  
+  <Step title="Find Custom Fields Section">
+    Scroll to the custom fields area on the form.
+  </Step>
+  
+  <Step title="Select Field">
+    Start typing the field name in the **Key** field.
+    
+    An autocomplete dropdown will appear with matching custom fields.
+  </Step>
+  
+  <Step title="Enter Value">
+    Select your custom field from the list.
+    
+    The **Value** field will adjust based on the field type:
+    - String/Integer/Date: Text input
+    - URL: URL input with validation
+    - Choice list: Dropdown menu
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **Save** to attach the custom field value to the object.
+  </Step>
+</Steps>
+
+<Warning>
+  Each custom field can only be attached **once** per object. You cannot have multiple values for the same custom field on a single object.
+</Warning>
+
+## Using Custom Fields in the API
+
+### Reading Custom Fields
+
+Custom fields appear as a dictionary in API responses:
+
+```json
+{
+  "id": 1234,
+  "hostname": "server01.example.com",
+  "custom_fields": {
+    "monitoring_system": "zabbix",
+    "docker_version": "20.10.7",
+    "backup_enabled": "true"
+  },
+  "configuration_variables": {
+    "monitoring_system": "zabbix"
+  }
+}
+```
+
+**Key Points:**
+- `custom_fields` contains ALL custom fields
+- `configuration_variables` only contains fields marked as configuration variables
+- Keys use the `attribute_name` from the custom field definition
+
+### Filtering by Custom Fields
+
+Filter API results using custom field values:
+
+```bash
+# Filter by Docker version
+curl "https://<YOUR-RALPH-URL>/api/data-center-assets/?customfield__docker_version=20.10.7"
+
+# Filter by monitoring system
+curl "https://<YOUR-RALPH-URL>/api/back-office-assets/?customfield__monitoring_system=zabbix"
+```
+
+Format: `customfield__<attribute_name>=<value>`
+
+### Managing Custom Field Values
+
+#### List Custom Fields for an Object
+
+```bash
+curl https://<YOUR-RALPH-URL>/api/assetmodels/1234/customfields/
+```
+
+Response:
+```json
+{
+  "count": 2,
+  "results": [
+    {
+      "id": 1,
+      "custom_field": {
+        "name": "docker version",
+        "attribute_name": "docker_version",
+        "type": "string",
+        "default_value": "1.10"
+      },
+      "value": "20.10.7",
+      "url": "https://<URL>/api/assetmodels/1234/customfields/1/"
+    }
+  ]
+}
+```
+
+#### Add Custom Field Value
+
+POST to the customfields endpoint:
+
+```bash
+curl -X POST https://<YOUR-RALPH-URL>/api/assetmodels/1234/customfields/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Token YOUR_TOKEN" \
+  -d '{
+    "custom_field": "docker_version",
+    "value": "20.10.7"
+  }'
+```
+
+You can use either the custom field **ID** or **attribute name**.
+
+#### Update Custom Field Value
+
+PATCH or PUT to the specific custom field:
+
+```bash
+curl -X PATCH https://<YOUR-RALPH-URL>/api/assetmodels/1234/customfields/1/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Token YOUR_TOKEN" \
+  -d '{
+    "value": "20.10.8"
+  }'
+```
+
+## Configuration Management Integration
+
+Custom fields marked as configuration variables integrate with automation tools.
+
+### Puppet Example
+
+Fetch configuration variables via API:
+
+```python
+import requests
+
+response = requests.get(
+    'https://ralph.example.com/api/data-center-assets/1234/',
+    headers={'Authorization': 'Token YOUR_TOKEN'}
+)
+
+asset = response.json()
+config_vars = asset['configuration_variables']
+
+# Use in Puppet manifest
+print(f"monitoring: {config_vars['monitoring_system']}")
+print(f"environment: {config_vars['environment']}")
+```
+
+### Ansible Example
+
+Use as variables in playbooks:
+
+```yaml
+---
+- name: Configure server
+  hosts: "{{ target_host }}"
+  vars:
+    ralph_config: "{{ lookup('url', ralph_api_url) | from_json }}"
+  tasks:
+    - name: Install monitoring agent
+      apt:
+        name: "{{ ralph_config.configuration_variables.monitoring_system }}-agent"
+        state: present
+```
+
+## Common Use Cases
+
+### Asset Metadata
+
+- Warranty information
+- Procurement order numbers
+- Internal asset classifications
+- Compliance tags
+
+### Configuration Data
+
+- Monitoring system preferences
+- Backup schedules
+- Software versions
+- Feature flags
+
+### Business Information
+
+- Cost center codes
+- Department assignments
+- Project identifiers
+- Custom lifecycle stages
+
+## Tips and Best Practices
+
+<Tip>
+  **Use Choice Lists**: When values are limited, use choice lists to ensure data consistency.
+</Tip>
+
+<Tip>
+  **Meaningful Names**: Choose clear, descriptive names that make sense to all users.
+</Tip>
+
+<Tip>
+  **Configuration Variables**: Only mark fields as configuration variables if they're actually used by automation tools.
+</Tip>
+
+<Tip>
+  **Default Values**: Set sensible defaults for fields that usually have a common value.
+</Tip>
+
+## Troubleshooting
+
+<Accordion title="Custom field not appearing in autocomplete">
+  - Ensure the custom field is saved and active
+  - The field may not be enabled for that specific model type
+  - Try refreshing your browser
+</Accordion>
+
+<Accordion title="Can't attach same field twice">
+  This is by design. Each custom field can only have one value per object. If you need multiple values, create separate custom fields (e.g., `contact_email_1`, `contact_email_2`).
+</Accordion>
+
+<Accordion title="Configuration variables not showing in API">
+  - Verify **"use as configuration variable"** is checked
+  - The field must have a value attached to the object
+  - Check API permissions for the user/token
+</Accordion>
+
+## Related Documentation
+
+- [DCIM](/user-guide/dcim) - Using custom fields with data center assets
+- [Deployment](/user-guide/deployment) - Configuration variables in deployment

@@ -1,0 +1,211 @@
+---
+title: Contributing to Ralph
+description: Learn how to contribute to Ralph's development, including bug fixes, features, and documentation
+---
+
+## Introduction
+
+Ralph is an open source Asset Management, DCIM, and CMDB system developed by Allegro. We welcome community involvement in discussions and development. All development processes, including planning, blueprinting, and sprints, are conducted in public.
+
+<Note>
+Allegro maintains Ralph under a "Sources only" model. While we welcome discussions, we do not guarantee responses to issues or support for pull requests. For commercial support, visit [ralph.discourse.group](http://ralph.discourse.group).
+</Note>
+
+## Quick Start
+
+Here's how to contribute a bug fix or feature:
+
+<Steps>
+  <Step title="Fork the repository">
+    Fork Ralph on [GitHub](https://github.com/allegro/ralph/)
+  </Step>
+  
+  <Step title="Clone your fork">
+    Checkout your fork locally to start making changes
+  </Step>
+  
+  <Step title="Write code">
+    Write your code following PEP8 rules, add tests, and commit your changes
+  </Step>
+  
+  <Step title="Push changes">
+    Push your changes to your fork on GitHub
+  </Step>
+  
+  <Step title="Open a pull request">
+    Submit a pull request from your fork to the main Ralph repository
+  </Step>
+</Steps>
+
+## Getting Started
+
+### Join the Community
+
+Introduce yourself and connect with other contributors:
+
+- **Gitter Chat**: [gitter.im/allegro/ralph](https://gitter.im/allegro/ralph) - Current Ralph-related issues and concerns are discussed here
+- **Community Forum**: [ralph.discourse.group](https://ralph.discourse.group) - Online forum for Ralph community
+- For quick responses, you can notify @vi4m on Gitter
+
+### Development Process
+
+#### Bug Tracker & Sprints
+
+Ralph uses GitHub Issues for development tracking:
+
+- **Issues**: Development work is tracked at [github.com/allegro/ralph/issues](https://github.com/allegro/ralph/issues)
+- **Milestones**: Used for development sprints (1-2 weeks per milestone) with estimated release dates
+- **Scrum Board**: Available at [waffle.io/allegro/ralph?label=ng](https://waffle.io/allegro/ralph?label=ng) - use milestone field for filtering
+
+#### Blueprints
+
+Major design decisions are discussed using "Blueprints":
+
+- Blueprints are GitHub issues containing design drafts, diagrams, and general discussion
+- Look for the `blueprint` label on the issues list to find them
+- Start a topic in the GitHub "issues" section to propose new features or changes
+
+## Code Standards
+
+### Python Code Style
+
+Ralph uses [Ruff](https://github.com/astral-sh/ruff) for code linting and formatting:
+
+```toml
+[tool.ruff]
+exclude = [
+  "*local.py",
+  "*migrations*"
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+ignore = []
+```
+
+Key requirements:
+
+- Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/) coding standards
+- Code must pass Ruff linting checks
+- Line length: 88 characters (default)
+- Python version: 3.10.0 to &lt;3.11
+
+### Django Template Standards
+
+When writing Django templates, follow these rules for readability:
+
+1. **Blank line** between `load` statements and the rest of the template
+2. **Blank line** between block sections
+3. **Indent** when opening HTML or Django template tags (excluding simple inline code and self-closing tags)
+4. **Use common sense** for human readability
+
+**Example:**
+
+```django
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans 'Users' %}{% endblock %}
+
+{% block sidebar %}
+  {% if users %}
+    <ul>
+      {% for user in users %}
+        <li>
+            <a href="{% url admin:users user.pk %}">{{ user }}</a>
+        </li>
+      {% endif %}
+    </ul>
+  {% endif %}
+{% endblock %}
+```
+
+## Development Workflow
+
+### Setting Up Your Environment
+
+Before contributing, set up your development environment:
+
+1. Install Python 3.10
+2. Install development dependencies (including ruff for linting)
+3. Review the [technical documentation](http://ralph-ng.readthedocs.org)
+
+### Making Changes
+
+<Steps>
+  <Step title="Create a feature branch">
+    Create a new branch from the main branch for your changes
+  </Step>
+  
+  <Step title="Write tests">
+    Add tests for your changes to ensure code quality and prevent regressions
+  </Step>
+  
+  <Step title="Run linting">
+    Use Ruff to check your code:
+    ```bash
+    ruff check .
+    ruff format .
+    ```
+  </Step>
+  
+  <Step title="Test your changes">
+    Run the test suite to ensure nothing breaks
+  </Step>
+  
+  <Step title="Commit with clear messages">
+    Write clear, descriptive commit messages explaining what and why
+  </Step>
+</Steps>
+
+## Types of Contributions
+
+### Code Contributions
+
+- **Bug fixes**: Fix reported issues from the GitHub tracker
+- **New features**: Implement new functionality (discuss in issues first)
+- **Refactoring**: Improve code quality and maintainability
+- **Performance improvements**: Optimize existing code
+
+### Documentation
+
+- Improve existing documentation
+- Add missing documentation
+- Fix typos and clarify unclear sections
+- Add examples and tutorials
+
+### Testing
+
+- Write tests for uncovered code
+- Improve existing tests
+- Report bugs with detailed reproduction steps
+
+## Best Practices
+
+### Do's
+
+- Start your topic on GitHub in the "issues" section for discussion
+- Follow Python best practices and write clean, maintainable code
+- Make contributions that add meaningful value
+- Review the technical/architecture documentation before coding
+- Write clear, descriptive commit messages
+- Add tests for your code changes
+
+### Don'ts
+
+- Don't ask "When is it ready?" - The answer is always "When it is ready"
+- Don't submit code that doesn't follow PEP 8 and Ruff standards
+- Don't make large changes without prior discussion
+- Don't commit without testing
+
+## Additional Resources
+
+- **Source Code**: [github.com/allegro/ralph](https://github.com/allegro/ralph)
+- **Documentation**: [ralph-ng.readthedocs.org](http://ralph-ng.readthedocs.org)
+- **Live Demo**: [ralph-demo.allegro.tech](http://ralph-demo.allegro.tech/) (login: ralph / password: ralph)
+- **Community Forum**: [ralph.discourse.group](https://ralph.discourse.group)
+- **Gitter Chat**: [gitter.im/allegro/ralph](https://gitter.im/allegro/ralph)
+
+<Info>
+Ralph is provided under the Apache v2.0 License. All contributions will be licensed under the same terms.
+</Info>

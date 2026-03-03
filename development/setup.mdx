@@ -1,0 +1,248 @@
+---
+title: "Local Development Setup"
+description: "Set up a local development environment for Ralph using Python virtual environments"
+---
+
+This guide walks you through setting up a local development environment for Ralph without Docker. This approach gives you direct control over the Python environment and is ideal for debugging and active development.
+
+<Note>
+  This guide assumes you're running a POSIX-compliant environment (Linux, macOS, or WSL on Windows).
+</Note>
+
+## Prerequisites
+
+Ensure the following tools are installed on your system:
+
+- **Python 3.10** (Ralph requires Python >=3.10.0, &lt;3.11)
+- **pip** - Python package manager
+- **virtualenvwrapper** - Virtual environment management
+- **Node.js** (v8.10.0 - v11.7.0) - For building static assets
+- **npm** (3.5.2 - 6.5.0) - JavaScript package manager
+- **mysql-client** system library
+  - macOS: `brew install mysql`
+  - Ubuntu/Debian: `apt-get install libmysqlclient-dev`
+- **Docker & docker-compose** - For running service dependencies (database, cache)
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the repository">
+    Get the Ralph source code:
+    
+    ```bash
+    git clone https://github.com/allegro/ralph.git
+    cd ralph
+    ```
+  </Step>
+
+  <Step title="Create a virtual environment">
+    Create and activate a Python virtual environment:
+    
+    ```bash
+    mkvirtualenv -p "$(which python3)" ralph
+    ```
+    
+    The environment will be activated automatically after creation. To activate it later:
+    
+    ```bash
+    workon ralph
+    ```
+  </Step>
+
+  <Step title="Install Python dependencies">
+    Install the development dependencies:
+    
+    ```bash
+    pip install -r requirements/dev.txt
+    ```
+    
+    <Note>
+      You may need to install additional system libraries and build tools if compilation fails for certain packages.
+    </Note>
+
+    The development dependencies include useful tools like:
+    - `django-debug-toolbar` - Debug panel for Django
+    - `ipdb`, `ipython`, `pudb` - Interactive debuggers
+    - `ruff` - Fast Python linter
+    - `django-silk` - Performance profiling
+  </Step>
+
+  <Step title="Install JavaScript dependencies">
+    Install Node.js packages and build static assets:
+    
+    ```bash
+    npm install
+    ```
+    
+    Then build the static files using Gulp:
+    
+    ```bash
+    ./node_modules/.bin/gulp
+    ```
+    
+    <Warning>
+      You must rebuild static files every time you modify JavaScript, CSS, or other static assets.
+    </Warning>
+  </Step>
+
+  <Step title="Start required services">
+    Use Docker Compose to run the database and cache services:
+    
+    ```bash
+    docker-compose -f docker/docker-compose-dev.yml up -d
+    ```
+    
+    This starts:
+    - **MySQL 5.7** on port 3306 (or PostgreSQL on port 54320)
+    - **Redis 4.0** on port 6379
+    - **inkpy** - Ralph's background worker service
+    
+    The services will create:
+    - Database: `ralph_ng`
+    - User: `ralph_ng` / password: `ralph_ng`
+    - Volumes stored in `./volumes/` directory
+  </Step>
+
+  <Step title="Configure Django settings">
+    Copy the local settings template:
+    
+    ```bash
+    cp src/ralph/settings/local.template src/ralph/settings/local.py
+    ```
+    
+    Set the Django settings module environment variable:
+    
+    ```bash
+    export DJANGO_SETTINGS_MODULE="ralph.settings.local"
+    ```
+    
+    <Tip>
+      Add this export to your shell profile (`~/.bashrc`, `~/.zshrc`) to make it permanent.
+    </Tip>
+  </Step>
+
+  <Step title="Initialize the database">
+    Run database migrations and create a superuser:
+    
+    ```bash
+    python setup.py develop
+    dev_ralph migrate
+    dev_ralph createsuperuser
+    ```
+    
+    Follow the prompts to create your admin user credentials.
+  </Step>
+
+  <Step title="Initialize the menu structure">
+    Synchronize the site menu tree:
+    
+    ```bash
+    make menu
+    ```
+    
+    This runs `ralph sitetree_resync_apps` to set up navigation.
+  </Step>
+
+  <Step title="Start the development server">
+    Launch Ralph in development mode:
+    
+    ```bash
+    make run
+    ```
+    
+    This runs `dev_ralph runserver_plus 0.0.0.0:8000` with auto-reload enabled.
+  </Step>
+</Steps>
+
+## Access Ralph
+
+Open your browser and navigate to:
+
+```
+http://127.0.0.1:8000
+```
+
+Log in with the superuser credentials you created in step 6.
+
+## Development Workflow
+
+### Auto-reload
+
+The development server automatically detects changes to Python files and reloads. You don't need to restart manually.
+
+### Database Configuration
+
+The default configuration in `src/ralph/settings/local.template` supports both MySQL and PostgreSQL. Switch between them using the `DB_ENGINE` environment variable:
+
+```python
+POSTGRES = os.environ.get("DB_ENGINE") != "mysql"
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql" if POSTGRES else "django.db.backends.mysql",
+        "NAME": os.environ.get("DATABASE_NAME", "ralph_ng"),
+        "USER": os.environ.get("DATABASE_USER", "ralph_ng"),
+        "PASSWORD": os.environ.get("DATABASE_PASSWORD", "ralph_ng"),
+        "HOST": os.environ.get("DATABASE_HOST", "127.0.0.1"),
+        "PORT": 54320 if POSTGRES else 3306,
+    }
+}
+```
+
+### Useful Commands
+
+| Command | Description |
+|---------|-------------|
+| `make run` | Start development server |
+| `make menu` | Resync site tree navigation |
+| `make test` | Run test suite |
+| `make coverage` | Run tests with coverage report |
+| `make checks` | Run ruff linter |
+| `make clean` | Remove compiled Python files |
+| `./node_modules/.bin/gulp` | Rebuild static assets |
+
+## Troubleshooting
+
+### Python Package Build Failures
+
+If you encounter errors installing Python packages, ensure you have the required system libraries:
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get install python3.10-dev libldap2-dev libsasl2-dev libffi-dev libmysqlclient-dev
+```
+
+**macOS:**
+```bash
+brew install mysql openldap
+```
+
+### Static Files Not Loading
+
+If CSS/JS assets aren't loading:
+
+1. Verify Node.js and npm versions are compatible
+2. Delete `node_modules/` and reinstall: `npm install`
+3. Rebuild static files: `./node_modules/.bin/gulp`
+
+### Database Connection Issues
+
+Verify services are running:
+```bash
+docker-compose -f docker/docker-compose-dev.yml ps
+```
+
+Check connectivity:
+```bash
+mysql -h 127.0.0.1 -u ralph_ng -pralph_ng ralph_ng
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Environment" icon="docker" href="/development/docker-environment">
+    Learn about Docker-based development
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/development/architecture">
+    Understand Ralph's architecture
+  </Card>
+</CardGroup>

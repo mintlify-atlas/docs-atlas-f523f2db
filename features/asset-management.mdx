@@ -1,0 +1,195 @@
+---
+title: Asset Management
+description: Track and manage all your IT assets throughout their entire lifecycle with Ralph's comprehensive asset management system
+---
+
+Ralph provides complete asset lifecycle management for both data center and back office equipment. Track purchases, warranties, depreciation, and locations in a single unified platform.
+
+## Overview
+
+Asset Management in Ralph enables you to:
+
+- Maintain a complete inventory of all IT assets
+- Track asset lifecycle from purchase to liquidation
+- Manage asset assignments to users and locations
+- Monitor depreciation and warranty periods
+- Generate detailed asset reports and analytics
+
+<CardGroup cols={2}>
+  <Card title="Data Center Assets" icon="server">
+    Servers, racks, network equipment, and infrastructure components with detailed specs and location tracking
+  </Card>
+  
+  <Card title="Back Office Assets" icon="laptop">
+    Laptops, desktops, printers, mobile phones, and accessories assigned to users
+  </Card>
+  
+  <Card title="Asset Models" icon="cubes">
+    Organize assets by manufacturer models with shared specifications and properties
+  </Card>
+  
+  <Card title="Lifecycle Tracking" icon="arrows-rotate">
+    Monitor assets through purchase, deployment, maintenance, and retirement phases
+  </Card>
+</CardGroup>
+
+## Asset Types
+
+### Data Center Assets
+
+Data center assets include physical hardware deployed in server rooms and racks:
+
+- **Servers** - Blade systems, rack servers, tower servers
+- **Network Equipment** - Switches, routers, load balancers
+- **Storage** - SAN, NAS, and storage arrays
+- **Accessories** - Patch panels, PDUs, KVM switches
+
+Each data center asset can be positioned in racks with specific U-level positioning and visualized on the DC floor plan.
+
+### Back Office Assets
+
+Back office assets are equipment assigned to individual users:
+
+- Laptops and desktop computers
+- Mobile phones and tablets
+- Printers and scanners
+- Monitors and accessories
+- Access cards
+
+These assets can be assigned to users and tracked through various statuses like "in use", "loan", "in service", or "liquidated".
+
+## Key Features
+
+### Asset Models
+
+Models help you organize multiple identical devices efficiently:
+
+1. **Create Model** - Define manufacturer, category, and specifications
+2. **Set Type** - Choose between data center or back office
+3. **Reuse** - All assets of the same model share common properties
+
+<Tip>
+Define models for your most common equipment types first. This makes adding new assets much faster - you only need to enter the barcode and assignment details.
+</Tip>
+
+### Required Fields
+
+To add a new asset to Ralph, you need:
+
+- **Model** - The device model (can be created on-the-fly)
+- **Barcode or Serial Number** - Unique identifier
+- **Service Environment** - The service and environment (prod/test/dev) this asset supports
+
+### Service Environment
+
+Service Environment groups assets by their business purpose:
+
+- **Service** - Business function (e.g., "Load Balancing", "Email Systems")
+- **Environment** - Deployment stage (production, testing, development)
+- **Owners** - Business and technical owners responsible for the service
+- **Support Team** - Team managing the infrastructure
+
+<Note>
+Service Environments are used throughout Ralph for organizing assets, generating reports, and controlling access permissions.
+</Note>
+
+## Asset Properties
+
+### Core Information
+
+- **Inventory Number** - Internal tracking ID
+- **Hostname** - Network hostname
+- **Status** - Current lifecycle status
+- **Owner/User** - Person responsible or using the asset
+- **Warehouse/Location** - Physical storage location
+
+### Financial Information
+
+- **Order Number** - Purchase order reference
+- **Invoice Date & Number** - Purchasing details
+- **Price** - Purchase price and depreciation
+- **Budget Info** - Cost center and budget allocation
+
+### Technical Details
+
+- **Model** - Hardware model and specifications
+- **Serial Number** - Manufacturer serial
+- **Firmware Version** - Current firmware/BIOS version
+- **Configuration Path** - Configuration management tool integration
+
+## Inventory Management
+
+### Warehouses
+
+Ralph supports multiple warehouses for storing assets:
+
+- Track assets before deployment
+- Enable stock-taking processes
+- Manage asset transfers between locations
+- Generate warehouse inventory reports
+
+### Stock-Taking
+
+Simplify physical inventory verification:
+
+1. Enable stock-taking for a warehouse or region
+2. Users review and confirm their assigned equipment
+3. System records confirmation tags and timestamps
+4. Export reports for audit compliance
+
+<Tip>
+Users can self-report their equipment status through the "My Equipment" view, dramatically reducing the time required for inventory audits.
+</Tip>
+
+## Asset Hierarchy
+
+Ralph supports parent-child relationships for complex configurations:
+
+- **Blade Server** → Blade Chassis
+- **Virtual Machine** → Hypervisor
+- **OpenStack VM** → OpenStack Tenant
+- **Disk** → Storage Array
+
+## Custom Fields
+
+Extend asset records with custom metadata:
+
+- Define custom fields for any asset type
+- Support for strings, integers, dates, URLs, and choice lists
+- Use as configuration variables for automation tools
+- Filter and report on custom field values
+
+See [Custom Fields](/user-guide/custom-fields) for detailed configuration.
+
+## Bulk Operations
+
+Perform actions on multiple assets simultaneously:
+
+- Bulk status changes
+- Mass assignment to users or locations
+- Batch export to Excel or CSV
+- Multi-asset transitions and workflows
+
+## Integration
+
+Asset data integrates with:
+
+- **Licenses** - Track software licenses assigned to hardware
+- **Supports** - Vendor support contracts linked to assets
+- **Networks** - IP addresses and network configuration
+- **Configuration Management** - Puppet, Ansible integration via API
+- **DCIM** - Physical location and power management
+
+## Reporting
+
+Generate comprehensive reports:
+
+- Asset inventory by location, service, or status
+- Depreciation and financial summaries
+- Upcoming warranty expirations
+- Asset assignment history
+- Custom reports via REST API
+
+<Card title="Next Steps" icon="arrow-right">
+  Learn how to visualize your data center assets in [Data Center Management](/features/data-center)
+</Card>

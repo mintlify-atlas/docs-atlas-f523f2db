@@ -1,0 +1,410 @@
+---
+title: "REST API"
+description: "Access Ralph's resources and operations through the REST API"
+---
+
+Ralph exposes many resources and operations through a RESTful web API that can be used for both querying the database and populating it with data. The API is built on [Django REST Framework](http://www.django-rest-framework.org/).
+
+## Authentication
+
+Ralph uses token-based authentication for API access. Each user has an auto-generated personal token.
+
+### Obtaining Your Token
+
+You can obtain your token either by visiting your profile page or by sending a request to the `api-token-auth` endpoint:
+
+```bash
+curl -H "Content-Type: application/json" \
+  -X POST https://<YOUR-RALPH-URL>/api-token-auth/ \
+  -d '{"username": "<YOUR-USERNAME>", "password": "<YOUR-PASSWORD>"}'
+```
+
+**Response:**
+```json
+{"token":"79ee13720dbf474399dde532daad558aaeb131c3"}
+```
+
+<Note>
+If you don't have an API token assigned, the above request will generate one automatically.
+</Note>
+
+### Using Your Token
+
+Include your API token in the `Authorization` header for each request:
+
+```bash
+curl -X GET https://<YOUR-RALPH-URL>/api/ \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+```
+
+## API Versioning
+
+The API requires clients to specify the version in the `Accept` header:
+
+```bash
+GET /api/data-center-assets/ HTTP/1.1
+Host: example.com
+Accept: application/json; version=v1
+Authorization: Token <YOUR-TOKEN>
+```
+
+## Output Formats
+
+Ralph API supports:
+- **JSON** (default) - For programmatic access
+- **HTML preview** - Browse to `https://<YOUR-RALPH-URL>/api/` in your browser for an interactive preview
+
+## HTTP Methods
+
+The following methods are available in the API:
+
+| Method | On a Collection | On a Single Resource |
+|--------|----------------|----------------------|
+| GET    | Get full list of resources | Get resource details |
+| POST   | Add a new resource | - |
+| PUT    | - | Edit the resource (all data required) |
+| PATCH  | - | Edit the resource (only changed data required) |
+| DELETE | - | Remove the resource |
+
+## Getting Resources
+
+### Get a Single Resource
+
+Use HTTP GET to retrieve details of a specific resource:
+
+```bash
+curl https://<YOUR-RALPH-URL>/api/data-center-assets/1/ \
+  -H 'Authorization: Token <YOUR-TOKEN>' | python -m json.tool
+```
+
+**Response:**
+```json
+{
+    "id": 11105,
+    "url": "http://127.0.0.1:8000/api/data-center-assets/1/",
+    "hostname": "aws-proxy-1.my-dc",
+    "status": "used",
+    "sn": "12345",
+    "barcode": "54321",
+    "price": "55500.00",
+    "remarks": "Used as proxy to AWS",
+    "position": 12,
+    "orientation": "front",
+    "configuration_path": "/aws_proxy/prod",
+    "service_env": {
+        "id": 11,
+        "url": "http://127.0.0.1:8000/api/service-environments/11/",
+        "service": {
+            "id": 1,
+            "url": "http://127.0.0.1:8000/api/services/1/",
+            "name": "AWS Proxy"
+        },
+        "environment": {
+            "id": 2,
+            "url": "http://127.0.0.1:8000/api/environments/2/",
+            "name": "prod"
+        }
+    },
+    "model": {
+        "id": 168,
+        "url": "http://127.0.0.1:8000/api/asset-models/168/",
+        "name": "R630",
+        "type": "data_center",
+        "power_consumption": 1234,
+        "height_of_device": 1.0,
+        "cores_count": 8,
+        "manufacturer": {
+            "id": 33,
+            "url": "http://127.0.0.1:8000/api/manufacturers/33/",
+            "name": "Dell"
+        }
+    },
+    "rack": {
+        "id": 15,
+        "url": "http://127.0.0.1:8000/api/racks/15/",
+        "name": "Rack 123",
+        "server_room": {
+            "id": 1,
+            "url": "http://127.0.0.1:8000/api/server-rooms/1/",
+            "name": "Room 1",
+            "data_center": {
+                "id": 99,
+                "url": "http://127.0.0.1:8000/api/data-centers/99/",
+                "name": "New York"
+            }
+        }
+    }
+}
+```
+
+### Get a List of Resources
+
+```bash
+curl https://<YOUR-RALPH-URL>/api/data-center-assets/ \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+```
+
+## Saving Resources
+
+### Update a Resource (PATCH)
+
+Use PATCH to update specific fields without providing all data:
+
+```bash
+curl -X PATCH https://<YOUR-RALPH-URL>/api/data-center-assets/1/ \
+  -H 'Authorization: Token <YOUR-TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "hostname": "aws-proxy-2.my-dc",
+    "status": "damaged",
+    "service_env": 12,
+    "licences": [1, 2, 3]
+  }'
+```
+
+<Note>
+**Important points when saving resources:**
+- To set a related object (foreign key), pass its ID (e.g., `"service_env": 12`)
+- To set many-to-many relations, pass an array of IDs (e.g., `"licences": [1, 2, 3]`)
+- You can use text values for choice fields (e.g., `"status": "damaged"`), even if stored as numbers
+</Note>
+
+### Create a Resource (POST)
+
+```bash
+curl -X POST https://<YOUR-RALPH-URL>/api/data-center-assets/ \
+  -H 'Authorization: Token <YOUR-TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "hostname": "new-server.my-dc",
+    "status": "new",
+    "model": 168,
+    "rack": 15,
+    "position": 10,
+    "service_env": 11
+  }'
+```
+
+## Filtering
+
+Ralph API supports multiple query filters to help you find the exact resources you need.
+
+### Check Available Filters
+
+Send an OPTIONS request to see which fields support filtering:
+
+```bash
+curl -X OPTIONS https://<YOUR-RALPH-URL>/api/data-center-assets/ \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+```
+
+Look for the `filtering` field in the response.
+
+### Filter Types
+
+#### Exact Match Filter
+
+Filter by exact field value:
+
+```bash
+curl "https://<YOUR-RALPH-URL>/api/data-center-assets/?hostname=s1234.local" \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+```
+
+#### Lookup Filters
+
+Use Django's `__` convention for advanced lookups:
+
+```bash
+# Hostname starts with 's123'
+curl "https://<YOUR-RALPH-URL>/api/data-center-assets/?hostname__startswith=s123" \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+
+# Invoice date less than or equal to 2015-01-01
+curl "https://<YOUR-RALPH-URL>/api/data-center-assets/?invoice_date__lte=2015-01-01" \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+```
+
+**Common lookup operators:**
+- `__startswith` - Starts with
+- `__endswith` - Ends with
+- `__contains` - Contains (case-sensitive)
+- `__icontains` - Contains (case-insensitive)
+- `__lte` - Less than or equal
+- `__gte` - Greater than or equal
+- `__in` - In a list of values
+
+See [Django Field lookups documentation](https://docs.djangoproject.com/en/stable/ref/models/querysets/#field-lookups) for more operators.
+
+#### Extended Filters
+
+Extended filters work across multiple fields in polymorphic models like `BaseObject`:
+
+```bash
+# Search by name across multiple asset types
+curl "https://<YOUR-RALPH-URL>/api/base-objects/?name=s1234.local" \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+
+# Extended filters also support lookups
+curl "https://<YOUR-RALPH-URL>/api/base-objects/?name__startswith=s123" \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+```
+
+#### Tag Filters
+
+Filter by one or more tags. Multiple tags are combined with AND logic:
+
+```bash
+# Find all assets with both tag1 AND tag2
+curl "https://<YOUR-RALPH-URL>/api/data-center-assets/?tag=tag1&tag=tag2" \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+```
+
+## Transitions API
+
+The Transitions API allows you to execute workflow transitions on assets.
+
+### List Available Transitions
+
+Get all available transitions for a specific asset:
+
+```bash
+curl https://<YOUR-RALPH-URL>/api/data-center-assets/46/transitions/ \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+```
+
+**Response:**
+```json
+{
+    "count": 2,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 5,
+            "url": "<URL>/api/transitions/5/",
+            "source": [
+                "new",
+                "in use",
+                "free",
+                "damaged",
+                "liquidated",
+                "to deploy"
+            ],
+            "target": "Keep original status",
+            "name": "Change rack",
+            "run_asynchronously": true,
+            "async_service_name": "ASYNC_TRANSITIONS",
+            "model": "<URL>/api/transitions-model/2/",
+            "actions": [
+                "<URL>/api/transitions-action/22/"
+            ]
+        }
+    ]
+}
+```
+
+### Get Transition Parameters
+
+Use OPTIONS to see what parameters a transition requires:
+
+```bash
+curl -X OPTIONS \
+  "https://<YOUR-RALPH-URL>/api/virtual/virtualserver/767/transitions/Initialization/" \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+```
+
+**Response:**
+```json
+{
+  "name": "Transition",
+  "description": "Transition API endpoint for selected model.",
+  "actions": {
+    "POST": {
+      "network_environment": {
+        "type": "choice",
+        "required": true,
+        "read_only": false,
+        "label": "Network environment",
+        "choices": [
+          {
+            "display_name": "aa0003bb (testowa)",
+            "value": "1"
+          },
+          {
+            "display_name": "Other",
+            "value": "__other__"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+### Execute a Transition
+
+Run a transition by POSTing to the transition endpoint:
+
+```bash
+curl -X POST \
+  "https://<YOUR-RALPH-URL>/api/virtual/virtualserver/767/transitions/Initialization/" \
+  -H 'Authorization: Token <YOUR-TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "network_environment": "1"
+  }'
+```
+
+## Available Resources
+
+Ralph exposes the following resource endpoints:
+
+- `/api/data-center-assets/` - Data center assets
+- `/api/back-office-assets/` - Back office assets
+- `/api/base-objects/` - All assets (polymorphic)
+- `/api/racks/` - Server racks
+- `/api/server-rooms/` - Server rooms
+- `/api/data-centers/` - Data centers
+- `/api/asset-models/` - Hardware models
+- `/api/manufacturers/` - Hardware manufacturers
+- `/api/services/` - Business services
+- `/api/service-environments/` - Service environments
+- `/api/environments/` - Environments (prod, test, etc.)
+- `/api/configuration-modules/` - Configuration modules
+- `/api/configuration-classes/` - Configuration classes
+- `/api/virtual-servers/` - Virtual machines
+- `/api/cloud-hosts/` - Cloud instances
+- `/api/networks/` - IP networks
+- `/api/ip-addresses/` - IP addresses
+- `/api/users/` - Users
+- `/api/groups/` - Groups
+
+<Note>
+Visit `https://<YOUR-RALPH-URL>/api/` in your browser for an interactive list of all available endpoints and to explore the API.
+</Note>
+
+## Error Handling
+
+The API uses standard HTTP status codes:
+
+- `200 OK` - Request succeeded
+- `201 Created` - Resource created successfully
+- `204 No Content` - Resource deleted successfully
+- `400 Bad Request` - Invalid request data
+- `401 Unauthorized` - Missing or invalid authentication token
+- `403 Forbidden` - User lacks permission for this resource
+- `404 Not Found` - Resource not found
+- `500 Internal Server Error` - Server error
+
+Error responses include a JSON body with details:
+
+```json
+{
+  "detail": "Authentication credentials were not provided."
+}
+```
+
+## Rate Limiting
+
+Ralph API does not impose rate limits by default, but administrators may configure rate limiting in their deployment. Contact your Ralph administrator for details.

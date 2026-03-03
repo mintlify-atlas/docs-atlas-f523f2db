@@ -1,0 +1,336 @@
+---
+title: Dashboards and Graphs
+description: Create custom dashboards with charts to visualize your Ralph data
+---
+
+Ralph's dashboard system provides a flexible mechanism for displaying data via bar charts and pie charts, helping you visualize key metrics about your infrastructure.
+
+## Overview
+
+Dashboards allow you to:
+
+- Create custom graphs from any Ralph model data
+- Display data as vertical bars, horizontal bars, or pie charts
+- Aggregate and filter data with complex queries
+- Push metrics to statsd for external monitoring
+- Build multiple graphs into unified dashboards
+
+## Getting Started
+
+This tutorial will walk through creating a dashboard showing asset quantities across data centers.
+
+### Demo Data
+
+To experiment with dashboards, generate sample data:
+
+```bash
+ralph make_demo_data
+```
+
+## Creating Your First Dashboard
+
+<Steps>
+  <Step title="Create Dashboard Object">
+    Navigate to **Dashboards → Dashboards** and click **Add new dashboard**.
+    
+    Give your dashboard a name and description.
+  </Step>
+  
+  <Step title="Create a Graph">
+    Click **Add Graph** and configure it with:
+    - **Name**: "DC Capacity"
+    - **Model**: Select the model to query (e.g., DataCenterAsset)
+    - **Chart Type**: Choose Vertical Bar, Horizontal Bar, or Pie Chart
+    - **Aggregate Type**: Count, Sum, Max, etc.
+  </Step>
+  
+  <Step title="Configure Graph Parameters">
+    Add the JSON configuration in the **Params** field (see below).
+  </Step>
+  
+  <Step title="Assign Graph to Dashboard">
+    After saving the graph, edit your dashboard and select the graph from the **Graphs** field.
+  </Step>
+  
+  <Step title="View Your Dashboard">
+    Go to **Dashboards → Dashboards** list view and click the **Link** icon to view your dashboard.
+  </Step>
+</Steps>
+
+## Graph Configuration
+
+Graphs are configured using JSON in the **Params** field.
+
+### Required Fields
+
+```json
+{
+  "labels": "name",
+  "series": "rack",
+  "filters": {
+    "status": "active"
+  }
+}
+```
+
+- **`labels`** - Field to use for string representation (x-axis labels)
+- **`series`** - Field to aggregate by
+- **`filters`** - Django ORM-style filter conditions
+
+### Optional Fields
+
+```json
+{
+  "excludes": {
+    "name__exact": null
+  },
+  "aggregate_expression": "id",
+  "limit": 10,
+  "sort": "-series"
+}
+```
+
+- **`excludes`** - Exclude items from results (opposite of filters)
+- **`aggregate_expression`** - Override default aggregation field
+- **`limit`** - Limit number of results
+- **`sort`** - Order results by field
+
+### Target Options
+
+Change the clickable graph behavior:
+
+```json
+{
+  "target": {
+    "model": "datacenterasset",
+    "filter": "rack__id__in",
+    "value": "rack__id"
+  }
+}
+```
+
+## Advanced Aggregation
+
+### Distinct Values
+
+Count distinct values using the `|distinct` modifier:
+
+```json
+{
+  "labels": "name",
+  "series": "serverroom__rack|distinct",
+  "filters": {
+    "series__lt": 5
+  }
+}
+```
+
+### Ratio Calculations
+
+Calculate ratios between two fields:
+
+```json
+{
+  "labels": "service_env__service__name",
+  "series": [
+    "securityscan__is_patched",
+    "id"
+  ]
+}
+```
+
+Set **Aggregate Type** to "Ratio" for this to work.
+
+### Date-Based Grouping
+
+Group by parts of dates:
+
+```json
+{
+  "labels": "service_env__service__name",
+  "series": "created|year"
+}
+```
+
+Available modifiers: `year`, `month`, `day`, `hour`, `minute`, `second`
+
+## Special Filters
+
+### Series Filter
+
+Filter on aggregated values:
+
+```json
+{
+  "labels": "name",
+  "series": "serverroom__rack",
+  "filters": {
+    "series__lt": 5
+  }
+}
+```
+
+This shows only labels where the count is less than 5.
+
+### OR and AND Operators
+
+```json
+{
+  "labels": "name",
+  "series": "serverroom__rack",
+  "excludes": {
+    "name__exact|or": [null, ""]
+  }
+}
+```
+
+Accepts a list of values to match.
+
+### Time-Relative Filters
+
+Filter by relative time using `from_now`:
+
+```json
+{
+  "labels": "name",
+  "series": "serverroom__rack__datacenterasset",
+  "filters": {
+    "created__gt|from_now": "-1y"
+  }
+}
+```
+
+Time units:
+- `y` - years
+- `m` - months  
+- `d` - days
+
+Example: `"-1y"` means one year ago to now.
+
+## Example Configurations
+
+### Assets by Data Center
+
+```json
+{
+  "labels": "rack__server_room__data_center__name",
+  "series": "id",
+  "filters": {
+    "status": 2
+  }
+}
+```
+
+### Services by Environment
+
+```json
+{
+  "labels": "service_env__environment__name",
+  "series": "id",
+  "excludes": {
+    "service_env__isnull": true
+  }
+}
+```
+
+### Asset Age Distribution
+
+```json
+{
+  "labels": "invoice_date|year",
+  "series": "id",
+  "filters": {
+    "invoice_date__isnull": false
+  },
+  "sort": "invoice_date|year"
+}
+```
+
+## Integration with Statsd
+
+Push graph data to statsd for external monitoring systems.
+
+<Steps>
+  <Step title="Configure Settings">
+    Add to your Ralph settings:
+    
+    ```python
+    STATSD_GRAPHS_PREFIX = 'ralph.graphs'
+    ALLOW_PUSH_GRAPHS_DATA_TO_STATSD = True
+    COLLECT_METRICS = True
+    ```
+  </Step>
+  
+  <Step title="Enable on Graph">
+    Check **Push to statsd** on your graph configuration.
+  </Step>
+  
+  <Step title="Push Data">
+    Run the management command:
+    
+    ```bash
+    ralph push_graphs_to_statsd
+    ```
+  </Step>
+</Steps>
+
+Set up a cron job to push data regularly.
+
+## REST API
+
+Access dashboard data via the REST API:
+
+```bash
+# Get all graphs
+curl https://<YOUR-RALPH-URL>/api/graph/ | python -m json.tool
+
+# Get specific graph details
+curl https://<YOUR-RALPH-URL>/api/graph/1/ | python -m json.tool
+```
+
+All endpoints are read-only.
+
+## Tips and Best Practices
+
+<Tip>
+  **Start Simple**: Begin with basic label/series configurations before adding complex filters.
+</Tip>
+
+<Tip>
+  **Test Filters**: Use Django's ORM query syntax. Test complex queries in the Django shell first.
+</Tip>
+
+<Tip>
+  **Performance**: Use `limit` to restrict large result sets and improve rendering speed.
+</Tip>
+
+<Warning>
+  Complex aggregations with multiple joins can be slow. Test performance with production data volumes.
+</Warning>
+
+## Troubleshooting
+
+<Accordion title="Graph shows no data">
+  Check:
+  - Your filters might be too restrictive
+  - The model has data matching your criteria
+  - Field names are correct (use Django model field names)
+  - JSON syntax is valid
+</Accordion>
+
+<Accordion title="JSON parsing error">
+  Common issues:
+  - Missing quotes around strings
+  - Trailing commas in JSON
+  - Incorrect bracket matching
+  - Use a JSON validator to check syntax
+</Accordion>
+
+<Accordion title="Distinct aggregation not working">
+  The `|distinct` modifier only works with Count aggregate type. Change your aggregate type to "Count".
+</Accordion>
+
+## Related Documentation
+
+- [Custom Fields](/user-guide/custom-fields) - Add custom data to visualize
+- [DCIM](/user-guide/dcim) - Data center asset data

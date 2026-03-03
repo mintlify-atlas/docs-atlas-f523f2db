@@ -1,0 +1,408 @@
+---
+title: Maintainer Tools
+description: Essential development tools and configuration for Ralph maintainers, including GnuPG setup, Git configuration, and GitHub account requirements.
+---
+
+Ralph maintainers have additional responsibilities beyond regular development, including releasing versions, signing commits, and publishing packages. This guide covers the required tools and configuration.
+
+<Note>
+While Ralph doesn't impose specific development tools for regular contributors, maintainers must configure certain tools to perform maintenance operations successfully.
+</Note>
+
+## GnuPG (GPG) Setup
+
+### Key Requirements
+
+Every Ralph maintainer must have:
+
+- **4096-bit GPG key** with signing capability
+- **Signed by other Ralph maintainers** to establish trust
+- **Expiration date set** for security
+- **Public key uploaded** to major key servers
+
+### Creating a GPG Key
+
+Follow the [GnuPG HowTo](https://www.gnupg.org/documentation/howtos.html) to create your key.
+
+**Recommended settings:**
+```bash
+gpg --full-generate-key
+```
+
+When prompted:
+- Key type: RSA and RSA
+- Key size: 4096 bits
+- Expiration: 2 years (recommended)
+- Real name: Your full legal name
+- Email: Match your git configuration email
+
+### Identity Requirements
+
+Your key identities must include:
+
+1. **Given name** according to an official document
+2. **Email address** specified in your git configuration
+
+You can add multiple identities if needed:
+```bash
+gpg --edit-key YOUR_KEY_ID
+> adduid
+```
+
+### Publishing Your Public Key
+
+Upload your public key to key servers:
+
+```bash
+# Export your public key
+gpg --armor --export YOUR_EMAIL > pubkey.asc
+
+# Upload to Ubuntu key server (recommended)
+gpg --keyserver hkp://keyserver.ubuntu.com --send-keys YOUR_KEY_ID
+
+# Upload to other key servers
+gpg --keyserver hkp://keys.openpgp.org --send-keys YOUR_KEY_ID
+gpg --keyserver hkp://pgp.mit.edu --send-keys YOUR_KEY_ID
+```
+
+<Tip>
+Uploading to Ubuntu's key server (`hkp://keyserver.ubuntu.com`) is recommended as it's widely used and reliable.
+</Tip>
+
+### Getting Your Key Signed
+
+Contact existing Ralph maintainers to get your key signed:
+
+1. **Export your key fingerprint:**
+   ```bash
+   gpg --fingerprint YOUR_EMAIL
+   ```
+
+2. **Share the fingerprint** with maintainers through a secure channel
+
+3. **Verify identity** via video call or in-person meeting
+
+4. **Maintainers sign your key:**
+   ```bash
+   gpg --sign-key YOUR_KEY_ID
+   ```
+
+### Shell Configuration for GPG
+
+If you use [fish](https://fishshell.com) or other fancy shells that manipulate TTYs, set the `GPG_TTY` variable:
+
+**For bash/zsh** (`~/.bashrc` or `~/.zshrc`):
+```bash
+export GPG_TTY=$(tty)
+```
+
+**For fish** (`~/.config/fish/config.fish`):
+```fish
+set -x GPG_TTY (tty)
+```
+
+<Warning>
+Without setting `GPG_TTY`, you may not be able to sign tags and commits. The shell won't be able to prompt for your GPG passphrase.
+</Warning>
+
+## Git Configuration
+
+### Required Settings
+
+Set these options either globally or locally for the Ralph repository:
+
+```bash
+# Set your full legal name (ASCII preferred)
+git config user.name "Jane Smith"
+
+# Set your email
+git config user.email "jane.smith@example.com"
+
+# Set your GPG signing key
+git config user.signingkey YOUR_KEY_ID
+
+# Enable commit signing by default (optional but recommended)
+git config commit.gpgsign true
+
+# Enable tag signing by default
+git config tag.gpgsign true
+```
+
+### Configuration Details
+
+**user.name**
+- Full name according to official documents
+- ASCII letters preferred (some tools may misinterpret non-ASCII characters)
+- Can use non-ASCII Latin characters if needed
+
+**user.email**
+- Must match one of the identities in your GPG key
+- Must be verified in your GitHub account
+
+**user.signingkey**
+- The ID of your GPG key
+- Find it with: `gpg --list-secret-keys --keyid-format LONG`
+
+### Verifying Git Configuration
+
+```bash
+# Check all git configuration
+git config --list | grep user
+
+# Test commit signing
+git commit --allow-empty -m "Test signing" -S
+
+# Verify the signature
+git verify-commit HEAD
+```
+
+## GitHub Account Requirements
+
+### Verified Email
+
+Your GitHub account must have a verified email that matches your git configuration:
+
+1. Go to **Settings → Emails**
+2. Add your email if not already added
+3. Click the verification link sent to your email
+4. Ensure the email is set as your primary or commit email
+
+### GPG Key Upload
+
+Add your public GPG key to GitHub:
+
+1. **Export your public key:**
+   ```bash
+   gpg --armor --export YOUR_EMAIL
+   ```
+
+2. **Copy the output** (including `-----BEGIN PGP PUBLIC KEY BLOCK-----` and `-----END PGP PUBLIC KEY BLOCK-----`)
+
+3. Go to **GitHub Settings → SSH and GPG keys → New GPG key**
+
+4. **Paste your public key** and click "Add GPG key"
+
+### Vigilant Mode (Recommended)
+
+Enable vigilant mode to flag unsigned commits:
+
+1. Go to **Settings → SSH and GPG keys**
+2. Check **"Flag unsigned commits as unverified"**
+
+This helps ensure all your commits are properly signed.
+
+## Releasing New Versions
+
+Maintainers use these tools to release new versions of Ralph. See the [Packaging](/development/packaging) documentation for the complete release process.
+
+### Prerequisites Check
+
+Before releasing, verify your setup:
+
+```bash
+# Check GPG key
+gpg --list-secret-keys --keyid-format LONG
+
+# Check Git config
+git config --get user.name
+git config --get user.email
+git config --get user.signingkey
+
+# Test GPG signing
+echo "test" | gpg --clearsign
+
+# Verify Git can sign
+git tag -s test-tag -m "Test tag"
+git tag -d test-tag
+```
+
+### Release Process Overview
+
+The `make release-new-version` target automates most of the process:
+
+```bash
+# 1. Ensure you're on ng branch and it's clean
+git checkout ng
+git status
+
+# 2. Pull latest changes
+git pull upstream ng
+
+# 3. Generate changelog and create signed tag
+make release-new-version
+
+# 4. Verify the changelog
+head debian/changelog
+
+# 5. Verify commit and tag signatures
+git verify-commit HEAD
+git verify-tag $(git describe --abbrev=0)
+
+# 6. Push to upstream with tags
+git push upstream ng --follow-tags
+
+# 7. Create GitHub release
+gh release create $(git describe --abbrev=0)
+```
+
+See `Makefile:12` for the implementation and [Packaging documentation](/development/packaging) for detailed release instructions.
+
+<Warning>
+**Critical**: All release commits and tags must be signed. Unsigned releases will be rejected.
+</Warning>
+
+## Docker Configuration
+
+Maintainers need Docker to build packages:
+
+```bash
+# Install Docker Desktop (macOS/Windows)
+# or Docker Engine (Linux)
+
+# Verify installation
+docker --version
+
+# Test Docker access
+docker run hello-world
+
+# Configure Docker resources (recommended)
+# Memory: 4GB minimum, 8GB recommended
+# CPUs: 2 minimum, 4 recommended
+```
+
+## Package Publishing
+
+### Packagecloud Access
+
+Maintainers with publishing rights need:
+
+1. **Packagecloud account** with access to `allegro/ralph` repository
+2. **API token** configured in environment:
+   ```bash
+   export PACKAGECLOUD_TOKEN="your-token-here"
+   ```
+
+### Docker Hub Access
+
+For publishing Docker images:
+
+1. **Docker Hub account** with access to `allegro` organization
+2. **Login to Docker Hub:**
+   ```bash
+   docker login
+   ```
+
+## Security Best Practices
+
+### GPG Key Management
+
+1. **Keep your private key secure**: Never share it or commit it to repositories
+
+2. **Use a strong passphrase**: At least 20 characters with mixed types
+
+3. **Backup your key**: Export and store securely
+   ```bash
+   gpg --export-secret-keys --armor YOUR_KEY_ID > private-key-backup.asc
+   ```
+
+4. **Set expiration dates**: Rotate keys every 2 years
+
+5. **Revoke compromised keys immediately**:
+   ```bash
+   gpg --gen-revoke YOUR_KEY_ID > revocation-cert.asc
+   gpg --import revocation-cert.asc
+   gpg --keyserver hkp://keyserver.ubuntu.com --send-keys YOUR_KEY_ID
+   ```
+
+### Commit Signing
+
+1. **Always sign release commits**: Use `git commit -S`
+
+2. **Verify signatures before pushing**:
+   ```bash
+   git log --show-signature -1
+   ```
+
+3. **Never push unsigned tags**: All version tags must be signed
+
+4. **Use signed tags**: `git tag -s` instead of `git tag -a`
+
+## Troubleshooting
+
+### GPG Agent Issues
+
+If GPG won't prompt for passphrase:
+
+```bash
+# Kill and restart GPG agent
+gpgconf --kill gpg-agent
+gpg-agent --daemon
+
+# Check GPG agent status
+echo GETINFO version | gpg-connect-agent
+```
+
+### Signature Verification Fails
+
+If signature verification fails:
+
+```bash
+# Import public keys from key server
+gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys KEY_ID
+
+# Trust the key
+gpg --edit-key KEY_ID
+> trust
+> 5 (ultimate trust)
+> quit
+```
+
+### GitHub Not Showing Verified Badge
+
+Ensure:
+1. Email in commit matches verified GitHub email
+2. GPG key is uploaded to GitHub
+3. Commit is signed: `git log --show-signature`
+4. Signature uses the uploaded key
+
+### "No Secret Key" Error
+
+Your GPG key may not be imported:
+
+```bash
+# List secret keys
+gpg --list-secret-keys
+
+# If missing, import from backup
+gpg --import private-key-backup.asc
+```
+
+## Tools Reference
+
+### Required Tools
+
+- **Git** 2.30+ (with GPG signing support)
+- **GnuPG** 2.2+ (GPG key management)
+- **Docker** 20.10+ (package building)
+- **Make** (build automation)
+- **GitHub CLI** (optional, for releases)
+
+### Recommended Tools
+
+- **GPG Suite** (macOS) - GUI for GPG key management
+- **Kleopatra** (Windows/Linux) - GPG key manager
+- **password-store** - GPG-based password manager
+- **git-crypt** - Encrypt sensitive files in repos
+
+## Additional Resources
+
+- [GnuPG Documentation](https://www.gnupg.org/documentation/)
+- [GitHub GPG Guide](https://docs.github.com/en/authentication/managing-commit-signature-verification)
+- [Git Signing Guide](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work)
+- [Packagecloud Documentation](https://packagecloud.io/docs)
+
+## Related Documentation
+
+- [Packaging](/development/packaging) - How Ralph is packaged and released
+- [Development Environment](/development/setup) - Setting up for development
+- [Contributing Guide](/contributing) - Guidelines for contributing to Ralph

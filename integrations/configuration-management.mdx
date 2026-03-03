@@ -1,0 +1,532 @@
+---
+title: "Configuration Management"
+description: "Integrate Ralph with Puppet, Ansible, and other configuration management tools"
+---
+
+Ralph supports integration with configuration management tools like Puppet and Ansible through its configuration path system. This allows you to automate host configuration by fetching configuration data from Ralph's API.
+
+## Overview
+
+Ralph provides a hierarchical configuration system that can be mapped to your configuration management tool's structure:
+
+- **Configuration Modules** - Top-level groupings (e.g., Puppet modules or Ansible roles)
+- **Configuration Classes** - Specific configurations to apply (e.g., Puppet classes or Ansible playbooks)
+- **Configuration Path** - Per-host configuration assignment
+- **Configuration Variables** - Custom fields exposed as variables
+
+## Configuration Modules
+
+Configuration modules represent the top-level organization of your configurations.
+
+### Creating Configuration Modules
+
+1. Navigate to `https://<YOUR-RALPH-URL>/assets/configurationmodule/`
+2. Click "Add configuration module"
+3. Fill in the details:
+   - **Name** - Module name (e.g., `apache`, `mysql`, `monitoring`)
+   - **Parent** - Optional parent module for hierarchical organization
+   - **Support team** - Team responsible for this module
+
+### Hierarchical Structure
+
+You can organize modules in a tree structure to reflect your directory layout:
+
+```
+webservices/
+  ├── apache/
+  ├── nginx/
+  └── haproxy/
+databases/
+  ├── mysql/
+  ├── postgresql/
+  └── mongodb/
+```
+
+<Tip>
+For Puppet users, configuration modules map directly to [Puppet modules](https://docs.puppet.com/puppet/latest/reference/modules_fundamentals.html).
+
+For Ansible users, use modules to group related roles or playbooks.
+</Tip>
+
+## Configuration Classes
+
+Configuration classes define specific configurations to be applied to hosts.
+
+### Creating Configuration Classes
+
+1. Navigate to `https://<YOUR-RALPH-URL>/assets/configurationclass/`
+2. Click "Add configuration class"
+3. Configure:
+   - **Module** - Parent configuration module
+   - **Class name** - Specific configuration name
+   - **Path** - Full path (auto-generated from module hierarchy)
+
+<Tip>
+For Puppet users, this maps to [Puppet classes](https://docs.puppet.com/puppet/latest/reference/lang_classes.html).
+
+For Ansible users, map this to [Ansible playbooks](http://docs.ansible.com/ansible/playbooks.html).
+</Tip>
+
+## Assigning Configuration to Hosts
+
+Assign configuration to assets using the `configuration_path` field:
+
+1. Edit a Data Center Asset, Virtual Server, or Cloud Host
+2. Set the **Configuration Path** field
+3. Save the asset
+
+The configuration path is now available via the API and can be used by your automation tools.
+
+### Via API
+
+Assign configuration when creating or updating an asset:
+
+```bash
+curl -X PATCH https://<YOUR-RALPH-URL>/api/data-center-assets/123/ \
+  -H 'Authorization: Token <YOUR-TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "configuration_path": "/webservices/apache/prod"
+  }'
+```
+
+## Puppet Integration
+
+### Architecture
+
+Ralph serves as the External Node Classifier (ENC) for Puppet:
+
+1. Puppet agent requests configuration for a host
+2. Puppet master queries Ralph API for host details
+3. Ralph returns configuration path and variables
+4. Puppet master applies the appropriate classes
+
+### Fetching Configuration from Ralph
+
+Create a Puppet ENC script (`/etc/puppetlabs/puppet/ralph_enc.py`):
+
+```python
+#!/usr/bin/env python3
+import sys
+import requests
+import yaml
+
+RALPH_URL = 'https://ralph.example.com'
+RALPH_TOKEN = 'your-api-token-here'
+
+def get_node_config(hostname):
+    headers = {'Authorization': f'Token {RALPH_TOKEN}'}
+    
+    # Query Ralph API for the host
+    response = requests.get(
+        f'{RALPH_URL}/api/data-center-assets/',
+        params={'hostname': hostname},
+        headers=headers
+    )
+    
+    if response.status_code != 200:
+        print(f'Error: {response.status_code}', file=sys.stderr)
+        sys.exit(1)
+    
+    data = response.json()
+    if not data['results']:
+        print(f'Host {hostname} not found', file=sys.stderr)
+        sys.exit(1)
+    
+    asset = data['results'][0]
+    
+    # Extract configuration
+    config = {
+        'classes': [],
+        'parameters': {}
+    }
+    
+    # Add configuration class if defined
+    if asset.get('configuration_path'):
+        config['classes'].append(asset['configuration_path'])
+    
+    # Add configuration variables from custom fields
+    if asset.get('configuration_variables'):
+        config['parameters'].update(asset['configuration_variables'])
+    
+    # Add environment
+    if asset.get('service_env', {}).get('environment', {}).get('name'):
+        config['environment'] = asset['service_env']['environment']['name']
+    
+    return config
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print('Usage: ralph_enc.py <hostname>', file=sys.stderr)
+        sys.exit(1)
+    
+    hostname = sys.argv[1]
+    config = get_node_config(hostname)
+    print(yaml.dump(config, default_flow_style=False))
+```
+
+Make it executable:
+
+```bash
+chmod +x /etc/puppetlabs/puppet/ralph_enc.py
+```
+
+### Configure Puppet Master
+
+Edit `/etc/puppetlabs/puppet/puppet.conf`:
+
+```ini
+[master]
+  node_terminus = exec
+  external_nodes = /etc/puppetlabs/puppet/ralph_enc.py
+```
+
+Restart Puppet master:
+
+```bash
+sudo systemctl restart puppetserver
+```
+
+### Example Puppet Output
+
+When Puppet queries Ralph for `web01.example.com`, the ENC script returns:
+
+```yaml
+classes:
+  - webservices::apache::prod
+parameters:
+  datacenter: NYC1
+  rack: R15
+  service: webservices
+environment: production
+```
+
+## Ansible Integration
+
+### Dynamic Inventory Script
+
+Create an Ansible dynamic inventory script (`inventory/ralph.py`):
+
+```python
+#!/usr/bin/env python3
+import json
+import requests
+import sys
+
+RALPH_URL = 'https://ralph.example.com'
+RALPH_TOKEN = 'your-api-token-here'
+
+def get_inventory():
+    headers = {'Authorization': f'Token {RALPH_TOKEN}'}
+    
+    # Fetch all data center assets
+    response = requests.get(
+        f'{RALPH_URL}/api/data-center-assets/',
+        headers=headers
+    )
+    
+    if response.status_code != 200:
+        print(f'Error: {response.status_code}', file=sys.stderr)
+        sys.exit(1)
+    
+    assets = response.json()['results']
+    
+    inventory = {
+        '_meta': {
+            'hostvars': {}
+        }
+    }
+    
+    for asset in assets:
+        hostname = asset.get('hostname')
+        if not hostname:
+            continue
+        
+        # Group by environment
+        env = asset.get('service_env', {}).get('environment', {}).get('name', 'ungrouped')
+        if env not in inventory:
+            inventory[env] = {'hosts': []}
+        inventory[env]['hosts'].append(hostname)
+        
+        # Group by service
+        service = asset.get('service_env', {}).get('service', {}).get('name')
+        if service:
+            if service not in inventory:
+                inventory[service] = {'hosts': []}
+            inventory[service]['hosts'].append(hostname)
+        
+        # Group by configuration path
+        config_path = asset.get('configuration_path')
+        if config_path:
+            if config_path not in inventory:
+                inventory[config_path] = {'hosts': []}
+            inventory[config_path]['hosts'].append(hostname)
+        
+        # Add host variables
+        hostvars = {
+            'ralph_id': asset['id'],
+            'ralph_url': asset['url'],
+            'serial_number': asset.get('sn'),
+            'barcode': asset.get('barcode'),
+            'rack': asset.get('rack', {}).get('name'),
+            'datacenter': asset.get('rack', {}).get('server_room', {}).get('data_center', {}).get('name'),
+        }
+        
+        # Add configuration variables
+        if asset.get('configuration_variables'):
+            hostvars.update(asset['configuration_variables'])
+        
+        inventory['_meta']['hostvars'][hostname] = hostvars
+    
+    return inventory
+
+def get_host(hostname):
+    # Ansible requires --host support
+    inventory = get_inventory()
+    return inventory['_meta']['hostvars'].get(hostname, {})
+
+if __name__ == '__main__':
+    if len(sys.argv) == 2 and sys.argv[1] == '--list':
+        print(json.dumps(get_inventory(), indent=2))
+    elif len(sys.argv) == 3 and sys.argv[1] == '--host':
+        print(json.dumps(get_host(sys.argv[2]), indent=2))
+    else:
+        print('Usage: ralph.py --list | --host <hostname>', file=sys.stderr)
+        sys.exit(1)
+```
+
+Make it executable:
+
+```bash
+chmod +x inventory/ralph.py
+```
+
+### Using the Dynamic Inventory
+
+Test the inventory:
+
+```bash
+# List all hosts and groups
+./inventory/ralph.py --list
+
+# Get variables for a specific host
+./inventory/ralph.py --host web01.example.com
+```
+
+Use with Ansible:
+
+```bash
+# Ping all hosts from Ralph
+ansible -i inventory/ralph.py all -m ping
+
+# Run playbook on production hosts
+ansible-playbook -i inventory/ralph.py site.yml --limit production
+
+# Target hosts by configuration path
+ansible-playbook -i inventory/ralph.py webserver.yml --limit webservices/apache
+```
+
+### Configure ansible.cfg
+
+```ini
+[defaults]
+inventory = inventory/ralph.py
+host_key_checking = False
+
+[inventory]
+enable_plugins = script
+```
+
+### Example Playbook
+
+```yaml
+---
+- name: Configure web servers from Ralph inventory
+  hosts: webservices/apache
+  become: yes
+  
+  tasks:
+    - name: Display host information from Ralph
+      debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          Datacenter: {{ datacenter }}
+          Rack: {{ rack }}
+          Serial: {{ serial_number }}
+          Ralph ID: {{ ralph_id }}
+    
+    - name: Install Apache
+      apt:
+        name: apache2
+        state: present
+      when: ansible_os_family == 'Debian'
+```
+
+## Configuration Variables
+
+Ralph allows you to define custom fields that are exposed as configuration variables via the API.
+
+### Creating Configuration Variables
+
+1. Navigate to **Admin** → **Custom Fields**
+2. Create a new custom field
+3. Check **"Use as configuration variable"**
+4. Apply to relevant model (Data Center Asset, Virtual Server, etc.)
+
+### Accessing Variables
+
+Configuration variables are available in the API response under `configuration_variables`:
+
+```bash
+curl https://<YOUR-RALPH-URL>/api/data-center-assets/123/ \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+```
+
+**Response:**
+```json
+{
+  "id": 123,
+  "hostname": "web01.example.com",
+  "configuration_path": "/webservices/apache/prod",
+  "configuration_variables": {
+    "max_connections": "1000",
+    "ssl_enabled": "true",
+    "backup_enabled": "true",
+    "monitoring_level": "detailed"
+  }
+}
+```
+
+These variables can be used in your Puppet manifests, Ansible playbooks, or other automation tools.
+
+## Best Practices
+
+### Naming Conventions
+
+- Use clear, descriptive names for modules and classes
+- Follow your organization's naming standards
+- Use hierarchical paths that reflect your infrastructure
+
+### Security
+
+<Warning>
+**Protect your API tokens:**
+- Store tokens in secure locations (e.g., HashiCorp Vault, AWS Secrets Manager)
+- Use read-only tokens when possible
+- Rotate tokens regularly
+- Never commit tokens to version control
+</Warning>
+
+```bash
+# Good: Load token from secure storage
+export RALPH_TOKEN=$(vault kv get -field=token secret/ralph)
+
+# Bad: Hardcoded token
+export RALPH_TOKEN="79ee13720dbf474399dde532daad558aaeb131c3"
+```
+
+### Error Handling
+
+- Implement retry logic for API calls
+- Log all API errors for troubleshooting
+- Provide fallback configurations if Ralph is unavailable
+- Monitor API response times
+
+### Caching
+
+Consider caching Ralph API responses to reduce load:
+
+```python
+import time
+import json
+from pathlib import Path
+
+CACHE_FILE = '/var/cache/ralph_inventory.json'
+CACHE_TTL = 300  # 5 minutes
+
+def get_cached_inventory():
+    if Path(CACHE_FILE).exists():
+        cache_age = time.time() - Path(CACHE_FILE).stat().st_mtime
+        if cache_age < CACHE_TTL:
+            with open(CACHE_FILE) as f:
+                return json.load(f)
+    
+    # Fetch fresh data
+    inventory = fetch_from_ralph()
+    
+    # Update cache
+    with open(CACHE_FILE, 'w') as f:
+        json.dump(inventory, f)
+    
+    return inventory
+```
+
+### Testing
+
+Always test configuration changes:
+
+```bash
+# Puppet: Dry run
+puppet agent --test --noop
+
+# Ansible: Check mode
+ansible-playbook -i inventory/ralph.py site.yml --check
+
+# Ansible: Diff mode
+ansible-playbook -i inventory/ralph.py site.yml --check --diff
+```
+
+## Troubleshooting
+
+### API Connection Issues
+
+```bash
+# Test API connectivity
+curl -v https://<YOUR-RALPH-URL>/api/ \
+  -H 'Authorization: Token <YOUR-TOKEN>'
+
+# Check DNS resolution
+nslookup ralph.example.com
+
+# Verify SSL certificate
+openssl s_client -connect ralph.example.com:443
+```
+
+### Missing Configuration Path
+
+If assets don't have a configuration path:
+
+1. Check that configuration modules and classes are created
+2. Verify the asset has a configuration path assigned
+3. Ensure your API query is correct
+4. Check API permissions for the user/token
+
+### Puppet ENC Debugging
+
+```bash
+# Test ENC script directly
+/etc/puppetlabs/puppet/ralph_enc.py web01.example.com
+
+# Enable Puppet debug logging
+puppet agent --test --debug
+```
+
+### Ansible Inventory Debugging
+
+```bash
+# Verify inventory script output
+./inventory/ralph.py --list | python -m json.tool
+
+# Check specific host
+./inventory/ralph.py --host web01.example.com
+
+# Test with ansible
+ansible -i inventory/ralph.py all --list-hosts
+ansible -i inventory/ralph.py all -m debug -a "var=hostvars"
+```
+
+## Related Documentation
+
+- [REST API](/integrations/api) - Complete API reference
+- [Custom Fields](/user-guide/custom-fields) - Creating configuration variables
+- [DCIM](/user-guide/dcim) - Data center asset management

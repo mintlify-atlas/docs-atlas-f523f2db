@@ -1,0 +1,404 @@
+---
+title: Data Migration
+description: Import data from various formats and migrate from Ralph 2 to Ralph 3
+---
+
+This guide covers importing data into Ralph from various sources, including CSV files, XML, and migrating from Ralph 2.
+
+## Data Import Methods
+
+Ralph supports data imports through:
+
+- **Command Line Interface (CLI)** - For automated and scripted imports
+- **Graphical User Interface (GUI)** - For interactive imports (feature in development)
+- **Migration Tools** - For upgrading from Ralph 2
+
+## CLI Import
+
+The CLI importer supports various file formats and provides flexible import options.
+
+### Import from CSV File
+
+Import a single CSV file for a specific model:
+
+```bash
+# Ubuntu
+sudo ralphctl importer --skipid --type file ./path/to/DataCenterAsset.csv --model_name DataCenterAsset
+
+# Docker
+docker-compose exec web ralph importer --skipid --type file /path/to/DataCenterAsset.csv --model_name DataCenterAsset
+```
+
+### Import from ZIP Archive
+
+Import multiple CSV files packaged in a ZIP archive:
+
+```bash
+# Ubuntu
+sudo ralphctl importer --skipid --type zip ./path/to/exported-files.zip
+
+# Docker
+docker-compose exec web ralph importer --skipid --type zip /path/to/exported-files.zip
+```
+
+### Importer Options
+
+View all available importer options:
+
+```bash
+# Ubuntu
+sudo ralphctl importer --help
+
+# Docker
+docker-compose exec web ralph importer --help
+```
+
+**Common Options:**
+
+- **`--skipid`** - Skip existing IDs and generate new ones (recommended for imports from other systems)
+- **`--type`** - Import type: `file` or `zip`
+- **`--model_name`** - Django model name (required for `file` type)
+- **`--update`** - Update existing records instead of creating new ones
+- **`--dry-run`** - Test import without making changes
+
+### Import Examples
+
+<CodeGroup>
+```bash Ubuntu - Single File
+# Import data center assets from CSV
+sudo ralphctl importer \
+  --skipid \
+  --type file \
+  --model_name DataCenterAsset \
+  ./imports/servers.csv
+```
+
+```bash Ubuntu - Multiple Files
+# Import multiple models from ZIP
+sudo ralphctl importer \
+  --skipid \
+  --type zip \
+  ./imports/complete-export.zip
+```
+
+```bash Docker - Single File
+# Import virtual servers
+docker-compose exec web ralph importer \
+  --skipid \
+  --type file \
+  --model_name VirtualServer \
+  /data/virtual-servers.csv
+```
+
+```bash Docker - Multiple Files
+# Import complete dataset
+docker-compose exec web ralph importer \
+  --skipid \
+  --type zip \
+  /data/ralph-export.zip
+```
+</CodeGroup>
+
+## Migration from Ralph 2
+
+If you're upgrading from Ralph 2, you can export all your data and import it into Ralph 3.
+
+<Warning>
+  **Before starting migration:**
+  - Backup your Ralph 2 database
+  - Test the migration on a staging environment first
+  - Plan for downtime during the migration
+  - Review data for any inconsistencies
+</Warning>
+
+### Migration Process
+
+<Steps>
+  <Step title="Export Data from Ralph 2">
+    On your Ralph 2 instance, export all data to a ZIP file:
+
+    ```bash
+    # In Ralph 2 environment
+    ralph export_model ralph2.zip
+    ```
+
+    This creates `ralph2.zip` containing CSV files for all models in the current directory.
+
+    <Tip>
+      The export includes all available models automatically. You don't need to specify which models to export.
+    </Tip>
+  </Step>
+
+  <Step title="Transfer Export File">
+    Transfer the `ralph2.zip` file to your Ralph 3 server.
+
+    **For Ubuntu installation:**
+    ```bash
+    scp ralph2.zip user@ralph3-server:/tmp/ralph2.zip
+    ```
+
+    **For Docker installation:**
+    ```bash
+    # Copy to a directory mounted in your container
+    cp ralph2.zip /path/to/ralph-docker/data/
+    ```
+  </Step>
+
+  <Step title="Import to Ralph 3">
+    Import the data into Ralph 3:
+
+    **Ubuntu:**
+    ```bash
+    sudo ralphctl importer --skipid --type zip /tmp/ralph2.zip
+    ```
+
+    **Docker:**
+    ```bash
+    docker-compose exec web ralph importer --skipid --type zip /data/ralph2.zip
+    ```
+
+    <Note>
+      The `--skipid` option is critical for Ralph 2 migrations. It skips the old IDs from Ralph 2 and generates new ones in Ralph 3, preventing ID conflicts.
+    </Note>
+  </Step>
+
+  <Step title="Verify Import">
+    After import completes:
+
+    1. Log into Ralph 3 web interface
+    2. Verify that your data appears correctly
+    3. Check record counts match expectations
+    4. Test key workflows and reports
+  </Step>
+
+  <Step title="Handle Import Errors (if any)">
+    If the import fails with errors:
+
+    1. Review error messages to identify data issues
+    2. Fix problems in Ralph 2 (e.g., missing required fields)
+    3. Clean your Ralph 3 database:
+       ```bash
+       # Ubuntu
+       sudo ralphctl flush
+       sudo ralphctl migrate
+
+       # Docker
+       docker-compose exec web ralph flush
+       docker-compose exec web ralph migrate
+       ```
+    4. Re-run the import
+
+    <Warning>
+      The `flush` command deletes all data from the database. Only use this during initial migration testing.
+    </Warning>
+  </Step>
+</Steps>
+
+## CSV File Format
+
+When preparing CSV files for import:
+
+### File Structure
+
+- **Encoding**: UTF-8
+- **Delimiter**: Comma (`,`)
+- **Quote Character**: Double quote (`"`)
+- **Header Row**: Required, contains field names matching model fields
+
+### Example CSV Structure
+
+```csv
+barcode,sn,hostname,model,status,service_env
+BC001,SN123456,server01.example.com,Dell PowerEdge R640,in_use,production
+BC002,SN123457,server02.example.com,Dell PowerEdge R640,in_use,production
+BC003,SN123458,server03.example.com,HP ProLiant DL380,new,staging
+```
+
+### Field Mapping
+
+- Use exact model field names from Ralph's database schema
+- For foreign keys, use the primary key value or natural key
+- Date fields should use ISO format: `YYYY-MM-DD`
+- DateTime fields: `YYYY-MM-DD HH:MM:SS`
+
+### Handling Relationships
+
+**Foreign Keys:**
+```csv
+hostname,model_id,rack_id
+server01,42,15
+```
+
+**Many-to-Many Relationships:**
+```csv
+hostname,tags
+server01,"production,critical,monitored"
+server02,"development,testing"
+```
+
+## GUI Import
+
+<Note>
+  The graphical import interface is currently under development. Use CLI import for now.
+</Note>
+
+The GUI import feature will provide:
+
+- Visual file upload interface
+- Field mapping tools
+- Import preview and validation
+- Progress tracking
+- Error reporting
+
+## Import Best Practices
+
+<AccordionGroup>
+  <Accordion title="Test Before Production Import">
+    Always test imports on a staging environment:
+
+    1. Set up a test Ralph instance
+    2. Import your data
+    3. Verify results
+    4. Document any issues or required adjustments
+    5. Only then import to production
+  </Accordion>
+
+  <Accordion title="Validate Data Before Import">
+    Clean your data before importing:
+
+    - Remove duplicate records
+    - Ensure required fields have values
+    - Validate foreign key references
+    - Check data format consistency
+    - Verify date/time formats
+  </Accordion>
+
+  <Accordion title="Use Dry Run Mode">
+    Test imports without making changes:
+
+    ```bash
+    ralphctl importer --dry-run --type file ./data.csv --model_name ModelName
+    ```
+
+    Review the output to identify potential issues.
+  </Accordion>
+
+  <Accordion title="Import in Logical Order">
+    When importing related data:
+
+    1. Import parent/reference tables first (e.g., Manufacturers, Models)
+    2. Then import dependent tables (e.g., Assets)
+    3. Finally import relationships (e.g., Licenses, Assignments)
+  </Accordion>
+
+  <Accordion title="Keep Backup of Import Files">
+    Maintain copies of:
+
+    - Original export files
+    - Modified/cleaned CSV files
+    - Import logs and error messages
+    - Database backups before import
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Common Import Errors
+
+<AccordionGroup>
+  <Accordion title="Foreign key constraint errors">
+    **Problem**: Referenced objects don't exist
+
+    **Solution**: Import parent tables before child tables, or update foreign key values to match existing records
+
+    ```bash
+    # Example: Import models before assets
+    ralphctl importer --type file ./models.csv --model_name AssetModel
+    ralphctl importer --type file ./assets.csv --model_name DataCenterAsset
+    ```
+  </Accordion>
+
+  <Accordion title="Duplicate key errors">
+    **Problem**: Records with same unique identifier already exist
+
+    **Solution**: Use `--skipid` flag to generate new IDs, or `--update` to update existing records
+
+    ```bash
+    ralphctl importer --skipid --type file ./data.csv --model_name ModelName
+    ```
+  </Accordion>
+
+  <Accordion title="Missing required field errors">
+    **Problem**: CSV missing required columns
+
+    **Solution**: Add missing columns to CSV or provide default values
+
+    ```csv
+    hostname,status,service_env
+    server01,in_use,production
+    ```
+  </Accordion>
+
+  <Accordion title="Encoding errors">
+    **Problem**: Special characters appear incorrectly
+
+    **Solution**: Ensure CSV files are UTF-8 encoded
+
+    ```bash
+    # Convert file to UTF-8
+    iconv -f ISO-8859-1 -t UTF-8 input.csv > output.csv
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Import Performance
+
+For large datasets:
+
+- Import during off-peak hours
+- Disable unnecessary background tasks
+- Temporarily increase database connection limits
+- Monitor system resources (CPU, RAM, disk I/O)
+- Consider splitting very large files into smaller batches
+
+### Getting Import Logs
+
+**Ubuntu:**
+```bash
+# View Ralph logs
+sudo tail -f /var/log/ralph/ralph.log
+```
+
+**Docker:**
+```bash
+# View container logs
+docker-compose logs -f web
+```
+
+## Export Data from Ralph 3
+
+You can also export data from Ralph 3 for backup or transfer:
+
+```bash
+# Ubuntu
+sudo ralphctl export_model output.zip
+
+# Docker  
+docker-compose exec web ralph export_model /data/output.zip
+```
+
+This creates a ZIP file with CSV exports of all models.
+
+## Next Steps
+
+After successful data import:
+
+1. **Verify data integrity** - Check that all records imported correctly
+2. **Set up permissions** - Configure user access and roles
+3. **Configure workflows** - Set up asset lifecycle transitions
+4. **Train users** - Familiarize your team with Ralph 3
+5. **Monitor performance** - Watch for any issues with imported data
+
+<Card title="Configuration Guide" icon="gear" href="/installation/configuration">
+  Configure LDAP, caching, and other advanced features
+</Card>

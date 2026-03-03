@@ -1,0 +1,265 @@
+---
+title: Data Center Visualization
+description: Visualize and manage your data center layout with interactive rack views
+---
+
+Ralph's DC Visualization provides an interactive graphical interface for managing your data center floor plan and rack layouts.
+
+## Overview
+
+The DC Visualization module lets you:
+
+- View data center floor plans with rack positions
+- Manage rack placement with drag-and-drop
+- Inspect individual rack contents and layouts
+- Add and configure racks directly from the visual interface
+- View both front and back of rack equipment
+
+## Accessing DC Visualization
+
+Navigate to **Data Center visualization** from the main menu to view your data center layout.
+
+## Managing Your Data Center Layout
+
+### Finding and Viewing Racks
+
+<Steps>
+  <Step title="Select Data Center">
+    From the DC Visualization page, select your data center from the dropdown.
+    
+    You'll see all racks displayed on a grid representing the floor plan.
+  </Step>
+  
+  <Step title="Locate Specific Racks">
+    Racks are displayed with their names and positions on the grid.
+    
+    Click on any rack to open the detailed rack inspector view.
+  </Step>
+</Steps>
+
+### Edit Mode
+
+Enter **Edit mode** to make changes to your data center layout:
+
+<Steps>
+  <Step title="Enable Edit Mode">
+    Click the **Edit** button in the top toolbar.
+  </Step>
+  
+  <Step title="Modify Rack Positions">
+    - **Drag racks** to new locations on the grid
+    - **Rotate racks** using the rotate button
+    - **Rename racks** by clicking the pencil icon
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **Save** when you're done to persist your changes.
+  </Step>
+</Steps>
+
+### Adding Multiple Racks
+
+You can quickly add several racks at once:
+
+<Steps>
+  <Step title="Enter Edit Mode">
+    Click **Edit** to enable editing.
+  </Step>
+  
+  <Step title="Add Racks">
+    Click on empty grid positions with the "plus cursor" to add new racks.
+    
+    Each click creates a new rack at that position.
+  </Step>
+  
+  <Step title="Configure Racks">
+    Edit each rack individually:
+    - Set the rack name
+    - Configure orientation
+    - Adjust position if needed
+  </Step>
+  
+  <Step title="Save All Changes">
+    Click **Save** to create all the new racks.
+  </Step>
+</Steps>
+
+## Rack Inspector
+
+The Rack Inspector provides a detailed view of individual rack contents.
+
+### Opening the Rack Inspector
+
+Click on any rack in the DC visualization to open the inspector view.
+
+### Rack Inspector Features
+
+**Dual-Side View**
+- View both **front** and **back** sides of the rack simultaneously
+- See equipment orientation (front-mounted vs. back-mounted)
+
+**Equipment Details**
+- Asset model and specifications
+- Service environment information
+- U position and slot allocation
+- Quick links to asset details
+
+**Visual Layout**
+- Color-coded assets by service or status
+- Blade system slot visualization
+- Empty U positions clearly marked
+
+### Editing Assets from Rack View
+
+From the Rack Inspector:
+
+1. Click **Edit asset** on any equipment
+2. The asset form opens with all details
+3. Make your changes
+4. Save to update the asset
+
+Changes appear immediately in the visualization.
+
+## Data Center Grid Configuration
+
+### Extending the Layout
+
+To accommodate more racks:
+
+<Steps>
+  <Step title="Go to Data Center Settings">
+    Navigate to **Data Center → Data Centers** and select your data center.
+  </Step>
+  
+  <Step title="Adjust Grid Size">
+    Modify the grid dimensions:
+    - **Columns** - Number of horizontal positions
+    - **Rows** - Number of vertical positions
+  </Step>
+  
+  <Step title="Save Configuration">
+    Click **Save** to apply the new grid size.
+  </Step>
+</Steps>
+
+## Rack Configuration
+
+### Rack Properties
+
+When configuring a rack, you can set:
+
+- **Name** - Unique rack identifier
+- **Server Room** - The room where the rack is located
+- **Orientation** - Direction the rack faces
+- **Column/Row Number** - Grid position for visualization
+- **Accessories** - Patch panels, organizers, etc.
+
+### Rack Position and Orientation
+
+**Position (U-Level)**
+- Standard equipment: U position (1-42 typically)
+- Back-mounted equipment: Position 0
+- Blade servers: Use slot numbers for same U position
+
+**Orientation**
+- Controls which direction the rack faces in the floor plan
+- Affects cable management and access planning
+
+## Asset Visualization Features
+
+### Color Coding
+
+Assets can be color-coded by:
+- Service environment
+- Asset status
+- Model category
+- Custom tags
+
+### Blade System Visualization
+
+For blade chassis:
+- Individual blade servers shown in separate slots
+- All blades at the same U position
+- Slot numbers displayed clearly
+- Empty slots marked as available
+
+### Interactive Elements
+
+- **Hover** - See quick asset information
+- **Click** - Open detailed asset view
+- **Search** - Find specific assets by barcode/name
+
+## Video Tutorial
+
+Watch this video demonstration of the Rack Inspector:
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/Dwhg-v7W5ZU" frameborder="0" allowfullscreen></iframe>
+
+## Common Workflows
+
+### Planning a New Installation
+
+<Steps>
+  <Step title="Check Available Space">
+    Use the DC Visualization to identify racks with free U positions.
+  </Step>
+  
+  <Step title="Reserve Position">
+    Note the rack name and available U positions for your new equipment.
+  </Step>
+  
+  <Step title="Add the Asset">
+    Create the asset with the planned rack and position (see [DCIM Guide](/user-guide/dcim)).
+  </Step>
+  
+  <Step title="Verify Placement">
+    Return to DC Visualization to confirm the asset appears correctly.
+  </Step>
+</Steps>
+
+### Reorganizing Racks
+
+<Steps>
+  <Step title="Document Current State">
+    Take note of current rack positions and equipment.
+  </Step>
+  
+  <Step title="Enter Edit Mode">
+    Enable editing in DC Visualization.
+  </Step>
+  
+  <Step title="Move Racks">
+    Drag racks to their new positions on the floor plan.
+  </Step>
+  
+  <Step title="Update Labels">
+    Rename racks if needed to reflect new naming conventions.
+  </Step>
+  
+  <Step title="Save and Verify">
+    Save changes and verify all equipment is correctly positioned.
+  </Step>
+</Steps>
+
+## Tips and Best Practices
+
+<Tip>
+  **Plan Your Grid**: Size your data center grid larger than current needs to allow for expansion.
+</Tip>
+
+<Tip>
+  **Use Consistent Naming**: Adopt a rack naming convention (e.g., "DC1-R01") for easy identification.
+</Tip>
+
+<Tip>
+  **Regular Reviews**: Periodically review the visualization to ensure it matches physical reality.
+</Tip>
+
+<Warning>
+  Remember to click **Save** when in Edit mode - changes are not automatically persisted!
+</Warning>
+
+## Related Documentation
+
+- [DCIM](/user-guide/dcim) - Managing data center assets
+- [Dashboards](/user-guide/dashboards) - Visualize asset data

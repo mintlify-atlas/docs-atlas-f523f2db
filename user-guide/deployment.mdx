@@ -1,0 +1,352 @@
+---
+title: Automated Deployment
+description: Configure automated server deployment with preboot configurations and PXE boot
+---
+
+Ralph's deployment module enables automated server provisioning using preboot configurations for Kickstart, Preseed, cloud-init, and iPXE.
+
+## Overview
+
+The deployment system provides:
+
+- **Automated OS installation** - Deploy Linux distributions automatically
+- **Multiple boot methods** - Kickstart, Preseed, cloud-init, iPXE
+- **Template variables** - Dynamic configuration based on asset data
+- **PXE network boot** - Boot from network for hands-off deployment
+- **Deployment tracking** - Monitor deployment status and history
+
+## Preboot Configuration
+
+Preboot configurations are templates that define how servers should be deployed.
+
+### Supported Configuration Types
+
+**Kickstart**
+- RedHat, CentOS, Fedora deployments
+- Anaconda-based installations
+
+**Preseed**
+- Debian and Ubuntu deployments
+- Debian-installer based systems
+
+**Meta-data and User-data**
+- Ubuntu 20.04+ using cloud-init/casper
+- Cloud-style configuration
+
+**iPXE**
+- Network boot configuration
+- Custom boot menus
+- Chainloading options
+
+## Creating Preboot Configurations
+
+<Steps>
+  <Step title="Navigate to Preboot Configurations">
+    Go to **Deployment → Preboot configuration** (`/deployment/prebootconfiguration/`)
+  </Step>
+  
+  <Step title="Add Configuration">
+    Click **Add preboot configuration**
+  </Step>
+  
+  <Step title="Configure Basic Settings">
+    Fill in:
+    - **Name** - Reference name for this configuration
+    - **Type** - Select kickstart, preseed, meta-data, user-data, iPXE, or script
+    - **Description** - Optional documentation
+  </Step>
+  
+  <Step title="Write Configuration Template">
+    Enter your configuration in the **Configuration** field.
+    
+    Use template variables (see below) for dynamic values.
+  </Step>
+  
+  <Step title="Save">
+    Click **Save** to create the configuration.
+  </Step>
+</Steps>
+
+## Template Variables
+
+Ralph provides variables that are replaced with actual values during deployment.
+
+### Available Variables
+
+Wrap variables in `{{ }}` to use them:
+
+**Asset Information**
+- `{{ hostname }}` - Full hostname (e.g., `ralph123.dc1.mydc.net`)
+- `{{ dc }}` - Data center name (e.g., `data-center1`)
+- `{{ domain }}` - Domain name (e.g., `dc1.mydc.net`)
+
+**Configuration Management**
+- `{{ configuration_class_name }}` - Configuration class (e.g., `www`)
+- `{{ configuration_module }}` - Configuration module (e.g., `ralph`)
+- `{{ configuration_path }}` - Full path (e.g., `ralph/www`)
+
+**Service Information**
+- `{{ service_env }}` - Service environment (e.g., `Backup systems - prod`)
+- `{{ service_uid }}` - Service unique ID (e.g., `sc-123`)
+
+**Deployment URLs**
+- `{{ deployment_id }}` - Unique deployment ID
+- `{{ kernel }}` - URL to kernel image
+- `{{ initrd }}` - URL to initrd image
+- `{{ kickstart }}` - URL to kickstart file
+- `{{ preseed }}` - URL to preseed file
+- `{{ script }}` - URL to custom script
+- `{{ meta_data }}` - URL to cloud-init meta-data
+- `{{ user_data }}` - URL to cloud-init user-data
+- `{{ done_url }}` - URL to mark deployment complete
+- `{{ deployment_base }}` - Base URL for deployment
+- `{{ ralph_instance }}` - Ralph instance URL
+
+### Example: Kickstart Template
+
+```bash
+lang en_US
+langsupport en_US
+keyboard us
+
+# Set hostname from Ralph
+network --hostname={{ hostname }}
+
+# Download post-install script
+%post
+curl {{ script }} | bash
+
+# Register with configuration management
+echo "{{ configuration_path }}" > /etc/puppet/manifest.txt
+
+# Mark deployment as complete
+curl -X POST {{ done_url }}
+%end
+```
+
+### Example: Cloud-Init User-Data
+
+```yaml
+#cloud-config
+hostname: {{ hostname }}
+fqdn: {{ hostname }}
+
+packages:
+  - puppet-agent
+  - vim
+
+runcmd:
+  - puppet config set server puppet.{{ domain }}
+  - puppet config set environment {{ service_env }}
+  - systemctl enable puppet
+  - systemctl start puppet
+  - curl -X POST {{ done_url }}
+```
+
+### Example: iPXE Configuration
+
+```
+#!ipxe
+
+kernel {{ kernel }} hostname={{ hostname }} ks={{ kickstart }}
+initrd {{ initrd }}
+boot
+```
+
+## Ralph Instance URL
+
+By default, URLs use `http://127.0.0.1:8000`. Configure this in settings:
+
+```python
+RALPH_INSTANCE = 'https://ralph.example.com'
+```
+
+All deployment URLs will use this base URL.
+
+## Deployment Workflow
+
+<Steps>
+  <Step title="Prepare Asset">
+    Create or select the data center asset to deploy.
+    
+    Ensure it has:
+    - Hostname (or will be auto-generated)
+    - Service environment
+    - Configuration path (if using config management)
+  </Step>
+  
+  <Step title="Configure PXE Boot">
+    Set up your DHCP/PXE server to:
+    - Boot from network
+    - Load iPXE or initial bootloader
+    - Point to Ralph's deployment endpoint
+  </Step>
+  
+  <Step title="Initiate Deployment">
+    Trigger deployment in Ralph or boot the server from network.
+    
+    Ralph generates a unique deployment ID and serves configuration files.
+  </Step>
+  
+  <Step title="Monitor Progress">
+    The deployment process:
+    - Downloads kernel and initrd
+    - Loads kickstart/preseed configuration
+    - Installs operating system
+    - Runs post-installation scripts
+    - Calls done_url when complete
+  </Step>
+  
+  <Step title="Verify Completion">
+    Check deployment status in Ralph.
+    
+    The asset should be marked as successfully deployed.
+  </Step>
+</Steps>
+
+## Integration Examples
+
+### Puppet Integration
+
+```bash
+# In kickstart %post section
+%post
+# Install Puppet
+yum install -y puppet-agent
+
+# Configure from Ralph variables
+puppet config set server puppet.{{ domain }}
+puppet config set environment production
+puppet config set certname {{ hostname }}
+
+# Set configuration path
+echo "{{ configuration_path }}" > /etc/puppet/role.txt
+
+# Enable and start
+systemctl enable puppet
+systemctl start puppet
+%end
+```
+
+### Ansible Integration
+
+```bash
+# Post-installation script
+#!/bin/bash
+
+# Install Ansible requirements
+apt-get update
+apt-get install -y python3 python3-pip
+pip3 install ansible
+
+# Fetch playbook from Ralph
+curl {{ ralph_instance }}/api/deployment/{{ deployment_id }}/playbook/ > /tmp/setup.yml
+
+# Run playbook
+ansible-playbook /tmp/setup.yml \
+  --extra-vars "hostname={{ hostname }}" \
+  --extra-vars "service={{ service_env }}"
+
+# Report completion
+curl -X POST {{ done_url }}
+```
+
+### Custom Scripts
+
+Serve custom scripts via the `{{ script }}` URL:
+
+```bash
+# In kickstart or preseed
+%post
+curl {{ script }} -o /tmp/custom-setup.sh
+bash /tmp/custom-setup.sh
+%end
+```
+
+The script can use Ralph's API to fetch additional configuration.
+
+## Advanced Configuration
+
+### Multiple Configurations
+
+Create different preboot configurations for:
+- Different OS distributions (CentOS vs Ubuntu)
+- Different environments (production vs development)
+- Different server roles (web server vs database)
+
+Select the appropriate configuration during deployment.
+
+### Dynamic Kernel Parameters
+
+iPXE configurations can pass dynamic parameters:
+
+```
+kernel {{ kernel }} \
+  hostname={{ hostname }} \
+  ks={{ kickstart }} \
+  service={{ service_uid }} \
+  dc={{ dc }} \
+  console=ttyS0,115200
+```
+
+### Deployment Completion Hook
+
+Always call `{{ done_url }}` at the end of deployment:
+
+```bash
+# Last step in post-install
+curl -X POST {{ done_url }}
+```
+
+This marks the deployment as complete in Ralph.
+
+## Tips and Best Practices
+
+<Tip>
+  **Test Templates**: Test preboot configurations on non-production systems before deploying to production.
+</Tip>
+
+<Tip>
+  **Version Control**: Store preboot configurations in git for change tracking and rollback capability.
+</Tip>
+
+<Tip>
+  **Error Logging**: Include logging in post-installation scripts to troubleshoot failed deployments.
+</Tip>
+
+<Tip>
+  **Security**: Use HTTPS for Ralph instance URL to protect credentials in configuration files.
+</Tip>
+
+<Warning>
+  Always call `{{ done_url }}` at the end of deployment. Otherwise, Ralph won't know the deployment completed.
+</Warning>
+
+## Troubleshooting
+
+<Accordion title="Variables not replaced">
+  - Ensure you're using the correct syntax: `{{ variable_name }}`
+  - Check that the variable exists in the available variables list
+  - Verify the asset has the required data (hostname, service env, etc.)
+</Accordion>
+
+<Accordion title="Deployment hangs">
+  - Check network connectivity to Ralph instance
+  - Verify RALPH_INSTANCE setting is correct and accessible
+  - Check firewall rules allow access to deployment URLs
+  - Review logs on the deploying server
+</Accordion>
+
+<Accordion title="Configuration not found">
+  - Ensure preboot configuration is saved and active
+  - Verify you selected the correct configuration type
+  - Check URL paths are correct
+</Accordion>
+
+## Related Documentation
+
+- [DCIM](/user-guide/dcim) - Managing deployed assets
+- [Custom Fields](/user-guide/custom-fields) - Configuration variables
+- External: [Kickstart documentation](https://docs.fedoraproject.org/en-US/fedora/latest/install-guide/appendixes/Kickstart_Syntax_Reference/)
+- External: [Debian Preseed](https://wiki.debian.org/DebianInstaller/Preseed)
+- External: [Cloud-init documentation](https://cloudinit.readthedocs.io/)

@@ -1,0 +1,250 @@
+---
+title: Ubuntu Installation
+description: Install Ralph on Ubuntu 18.04 Bionic and newer using official Debian packages
+---
+
+This guide covers installing Ralph on Ubuntu using the official Debian packages. This is the recommended method for production deployments.
+
+## Overview
+
+The Ubuntu package installation provides:
+
+- **Python 3.10+** runtime environment
+- **Settings** located in `/etc/ralph`
+- **Database configuration** via debconf prompts
+- **ralphctl** command for Ralph management
+- **Systemd service** for automatic startup and management
+
+## Prerequisites
+
+- Clean Ubuntu 18.04 Bionic or newer installation
+- Root or sudo access
+- Internet connection for package downloads
+
+## Installation Steps
+
+<Steps>
+  <Step title="Add Ralph Repository">
+    Add the official Ralph package repository and GPG key:
+
+    ```bash
+    curl -sL https://packagecloud.io/allegro/ralph/gpgkey | sudo apt-key add -
+    sudo sh -c "echo 'deb https://packagecloud.io/allegro/ralph/ubuntu/ bionic main' > /etc/apt/sources.list.d/ralph.list"
+    sudo apt-get update
+    ```
+  </Step>
+
+  <Step title="Install Required Packages">
+    Install Ralph along with MySQL and nginx:
+
+    ```bash
+    sudo apt-get install mysql-server nginx ralph-core
+    ```
+
+    <Note>
+      During installation, you'll be prompted for database settings via debconf. For testing, the default settings are fine. You can review them later in `/etc/ralph/conf.d/database.conf`.
+    </Note>
+  </Step>
+
+  <Step title="Configure Nginx">
+    Edit the nginx configuration file:
+
+    ```bash
+    sudo nano /etc/nginx/sites-available/default
+    ```
+
+    Replace the contents with:
+
+    ```nginx
+    server {
+        listen 80;
+        client_max_body_size 512M;
+
+        proxy_set_header Connection "";
+        proxy_http_version 1.1;
+        proxy_connect_timeout  300;
+        proxy_read_timeout 300;
+
+        access_log /var/log/nginx/ralph-access.log;
+        error_log /var/log/nginx/ralph-error.log;
+
+        location /static {
+            alias /usr/share/ralph/static;
+            access_log        off;
+            log_not_found     off;
+            expires 1M;
+        }
+
+        # Uncomment to enable media file downloads
+        #location /media {
+        #    alias /var/local/ralph/media;
+        #    add_header Content-disposition "attachment";
+        #}
+
+        location / {
+            proxy_pass http://127.0.0.1:8000;
+            include /etc/nginx/uwsgi_params;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+    }
+    ```
+
+    Restart nginx to apply changes:
+
+    ```bash
+    sudo systemctl restart nginx.service
+    ```
+  </Step>
+
+  <Step title="Configure Database">
+    Create the Ralph database and user:
+
+    ```bash
+    sudo mysql
+    ```
+
+    In the MySQL prompt:
+
+    ```sql
+    CREATE USER 'ralph_ng'@'127.0.0.1' IDENTIFIED BY 'ralph_ng';
+    GRANT ALL PRIVILEGES ON ralph_ng.* TO 'ralph_ng'@'127.0.0.1';
+    CREATE DATABASE ralph_ng;
+    EXIT;
+    ```
+
+    <Warning>
+      For production, use a strong password instead of 'ralph_ng' and consider placing the database on a separate host.
+    </Warning>
+  </Step>
+
+  <Step title="Initialize Database">
+    Run database migrations to create the schema:
+
+    ```bash
+    sudo ralphctl migrate
+    ```
+
+    Create your admin superuser:
+
+    ```bash
+    sudo ralphctl createsuperuser
+    ```
+
+    Optionally, load demo data for testing:
+
+    ```bash
+    sudo ralphctl demodata
+    ```
+  </Step>
+
+  <Step title="Start Ralph Service">
+    Finalize the setup and start Ralph:
+
+    ```bash
+    sudo ralphctl sitetree_resync_apps
+    sudo systemctl enable ralph.service
+    sudo systemctl start ralph.service
+    ```
+
+    Ralph should now be running at [http://localhost](http://localhost)
+  </Step>
+</Steps>
+
+## Configuration Files
+
+Ralph configuration is managed through environment variables stored in configuration files:
+
+- **Main config**: `/etc/ralph/ralph.conf`
+- **Database**: `/etc/ralph/conf.d/database.conf`
+- **Redis**: `/etc/ralph/conf.d/redis.conf`
+- **Gunicorn**: `/etc/ralph/conf.d/gunicorn.conf`
+- **Cache**: `/etc/ralph/conf.d/cache.conf`
+
+## Service Management
+
+Ralph runs as a systemd service. Common management commands:
+
+```bash
+# Check service status
+sudo systemctl status ralph.service
+
+# Start Ralph
+sudo systemctl start ralph.service
+
+# Stop Ralph
+sudo systemctl stop ralph.service
+
+# Restart Ralph
+sudo systemctl restart ralph.service
+
+# View service logs
+sudo journalctl -u ralph.service -f
+```
+
+## Troubleshooting
+
+If something goes wrong, check these log files:
+
+```bash
+# Ralph application logs
+/var/log/ralph/ralph.log
+
+# Gunicorn error logs
+/var/log/ralph/gunicorn.error.log
+
+# Gunicorn access logs
+/var/log/ralph/gunicorn.access.log
+
+# Nginx error logs
+/var/log/nginx/ralph-error.log
+
+# Nginx access logs
+/var/log/nginx/ralph-access.log
+```
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Ralph service won't start">
+    Check the logs for errors:
+    ```bash
+    sudo journalctl -u ralph.service -n 50
+    sudo tail -f /var/log/ralph/ralph.log
+    ```
+    
+    Common causes:
+    - Database connection issues
+    - Missing migrations
+    - Port 8000 already in use
+  </Accordion>
+
+  <Accordion title="Cannot connect to database">
+    Verify database credentials in `/etc/ralph/conf.d/database.conf` and ensure:
+    - MySQL service is running: `sudo systemctl status mysql`
+    - Database user has proper permissions
+    - Database exists: `mysql -u ralph_ng -p -e "SHOW DATABASES;"`
+  </Accordion>
+
+  <Accordion title="Static files not loading">
+    Ensure static files are collected and nginx can access them:
+    ```bash
+    sudo ralphctl collectstatic --noinput
+    sudo chown -R www-data:www-data /usr/share/ralph/static
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Once Ralph is installed:
+
+1. **Configure Ralph** for your environment - see [Configuration Guide](/installation/configuration)
+2. **Set up SSL/TLS** for production use
+3. **Configure backups** for your database
+4. **Review security settings** and change default passwords
+5. **Explore the quick start guide** to begin using Ralph
+
+<Card title="Configuration Guide" icon="gear" href="/installation/configuration">
+  Learn how to configure LDAP, OpenStack sync, and other advanced features
+</Card>

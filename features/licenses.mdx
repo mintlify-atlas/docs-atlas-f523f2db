@@ -1,0 +1,353 @@
+---
+title: License Management
+description: Track software licenses, monitor usage, and ensure compliance with comprehensive license assignment and reporting
+---
+
+Ralph's License Management module helps you track software licenses, monitor assignment to users and assets, prevent over-allocation, and maintain compliance.
+
+## Overview
+
+The Licenses module provides:
+
+- Software license inventory and tracking
+- Assignment to users and assets
+- Automatic free license calculation
+- Usage reports and compliance monitoring
+- Support for multiple license types
+- Regional license management
+
+<CardGroup cols={2}>
+  <Card title="License Types" icon="tags">
+    Per-user, per-core, per-processor, and other flexible license models
+  </Card>
+  
+  <Card title="Free License Tracking" icon="chart-line">
+    Automatic calculation of available licenses based on assignments
+  </Card>
+  
+  <Card title="Software Categories" icon="layer-group">
+    Organize licenses by software product and version
+  </Card>
+  
+  <Card title="Usage Reports" icon="file-chart-column">
+    Detailed reports on license utilization and compliance
+  </Card>
+</CardGroup>
+
+## License Types
+
+Ralph supports various licensing models:
+
+### Per-User Licenses
+
+Licenses assigned to individual users:
+
+- Microsoft Office 365
+- Adobe Creative Cloud
+- Development tools and IDEs
+- SaaS subscriptions
+
+Assignments are made to user accounts, and each user consumes one or more license units.
+
+### Per-Device Licenses
+
+Licenses tied to specific hardware:
+
+- Windows operating systems
+- Server software
+- Hardware-locked applications
+- Embedded system licenses
+
+Assigned to data center assets, back office assets, or other hardware.
+
+### Per-Core / Per-Processor
+
+Licenses based on CPU resources:
+
+- Database servers (Oracle, SQL Server)
+- Virtualization platforms
+- High-performance computing software
+
+Quantity reflects the number of cores or processors licensed.
+
+### Other License Types
+
+- **Site Licenses** - Unlimited use within a location
+- **Concurrent Licenses** - Limited number of simultaneous users
+- **Enterprise Agreements** - Organization-wide licensing
+- **Volume Licenses** - Bulk purchase discounts
+
+## Software Categories
+
+### Creating Software Products
+
+Define the software products you license:
+
+1. **Name** - Product name (e.g., "Microsoft Office 2015")
+2. **Asset Type** - Where it can be used:
+   - Data Center only
+   - Back Office only
+   - All (both data center and back office)
+3. **Additional Details** - Version, vendor information
+
+<Tip>
+Set asset type to "All" for software that might be used on both servers and workstations, like monitoring agents or security software.
+</Tip>
+
+## Creating Licenses
+
+### Required Information
+
+To add a new license:
+
+1. **License Type** - Per-user, per-device, per-core, etc.
+2. **Software** - Select or create software product
+3. **Number of Purchased Items** - Total licenses purchased
+4. **Region** - Geographic region or location
+5. **Serial Number** - License key or activation code
+
+### Optional Fields
+
+- **Inventory Number** - Internal tracking number
+- **Order Number** - Purchase order reference
+- **Invoice Date & Number** - Financial tracking
+- **Price** - License cost
+- **Budget Info** - Cost center allocation
+- **Valid From/To** - License validity period
+- **Manufacturer** - Software vendor
+- **Remarks** - Additional notes
+
+<Note>
+Don't create separate license records for each individual license in a bulk purchase. Instead, create one record and set "Number of purchased items" to the total quantity.
+</Note>
+
+## License Assignment
+
+### Assigning to Hardware
+
+For per-device or per-core licenses:
+
+1. **Open License** - Navigate to license detail page
+2. **Assignments Tab** - Select the Assignments tab
+3. **Search Asset** - Find by barcode, hostname, or browse
+4. **Set Quantity** - Number of licenses to assign (default: 1)
+5. **Save** - Assignment is recorded
+
+Example: Assigning a 10-core SQL Server license:
+- Find the server asset
+- Set quantity to 10 (for 10 cores)
+- Available licenses decrease by 10
+
+### Assigning to Users
+
+For per-user licenses:
+
+1. **Open License** - Navigate to license detail page
+2. **Assigned to Users Tab** - Select user assignment tab
+3. **Search User** - Find user by name or ID
+4. **Set Quantity** - Number of licenses per user (usually 1)
+5. **Save** - Assignment is recorded
+
+<Tip>
+You can assign the same license to both users and assets if your licensing agreement allows it. Ralph tracks both assignment types separately.
+</Tip>
+
+## Free License Tracking
+
+Ralph automatically calculates available licenses:
+
+```
+Free Licenses = Purchased Licenses - Assigned Licenses
+```
+
+### Real-Time Updates
+
+The system shows:
+
+- **Number of Purchased Items** - Total licenses owned
+- **Used** - Currently assigned licenses
+- **Free** - Available for assignment
+
+<Note>
+Ralph prevents over-allocation. The UI displays warnings when you approach the license limit and can be configured to block assignments that would exceed purchased quantity.
+</Note>
+
+### Viewing from Assets
+
+From any asset detail page:
+
+1. **Licenses Tab** - View licenses assigned to this asset
+2. **Add License** - Assign additional licenses
+3. **Remove License** - Remove license assignments
+4. **License Details** - Click through to full license info
+
+## Regional Management
+
+Support for multi-regional licensing:
+
+- **Regions** - Geographic areas (US, EU, APAC, etc.)
+- **Regional Licenses** - Licenses restricted to specific regions
+- **Compliance** - Ensure proper geographic usage
+- **Reporting** - License usage by region
+
+<Note>
+If you operate in a single location, create a "default" region as a workaround. This field is required for license creation.
+</Note>
+
+## License Lifecycle
+
+### Purchase
+
+1. **Create License Record** - Enter purchase details
+2. **Upload Invoice** - Attach purchase documentation
+3. **Set Validity** - Configure expiration if applicable
+4. **Budget Allocation** - Link to cost center
+
+### Assignment
+
+- Assign to users or assets as needed
+- Track assignment history
+- Monitor utilization
+
+### Renewal
+
+- Set valid_to date for expiring licenses
+- Create reports for upcoming renewals
+- Update license records with new keys
+
+### Retirement
+
+- Remove all assignments
+- Mark as inactive or delete
+- Archive documentation
+
+## Reporting
+
+### License Usage Reports
+
+Generate detailed compliance reports:
+
+1. **Navigate to Reports** - Licenses section
+2. **Select Report Type** - Usage, compliance, or custom
+3. **Filter** - By software, region, or time period
+4. **Export** - Download as PDF, Excel, or CSV
+
+### Available Reports
+
+- **License Utilization** - Used vs. free licenses by product
+- **Over-Allocated Licenses** - Products exceeding purchased quantity
+- **Expiring Licenses** - Upcoming renewal dates
+- **Assignments by User** - All licenses assigned to each user
+- **Assignments by Asset** - All licenses on each device
+- **Cost Analysis** - Total license costs by department or software
+
+<Tip>
+Schedule regular license compliance reports (monthly or quarterly) to identify unused licenses that could be reassigned or not renewed.
+</Tip>
+
+## Integration
+
+### Assets
+
+Licenses integrate seamlessly with asset management:
+
+- View licenses from asset detail pages
+- Assign licenses during asset deployment
+- Track license history per asset
+- Include in asset reports
+
+### Transitions
+
+Automate license assignment during workflows:
+
+- Auto-assign OS licenses during deployment
+- Remove licenses when decommissioning assets
+- Transfer licenses during asset reassignment
+
+### API Access
+
+Manage licenses programmatically:
+
+```bash
+# Get all licenses
+curl https://ralph.example.com/api/licences/
+
+# Get specific license
+curl https://ralph.example.com/api/licences/123/
+
+# Get assignments
+curl https://ralph.example.com/api/licences/123/assignments/
+```
+
+## Best Practices
+
+<Tip>
+**Centralize License Keys**: Store all license keys and activation codes in Ralph's serial number field. This creates a single source of truth for software deployments.
+</Tip>
+
+<Tip>
+**Set Expiration Dates**: For subscription licenses, always set the valid_to date. This enables expiration reports and prevents using expired licenses.
+</Tip>
+
+<Tip>
+**Regular Audits**: Review license assignments quarterly to identify:
+- Unused licenses that can be reassigned
+- Over-allocated products requiring additional purchases
+- Licenses assigned to decommissioned assets
+</Tip>
+
+<Note>
+Attach vendor agreements and proof of purchase documents to license records using the attachments feature. This documentation is crucial during vendor audits.
+</Note>
+
+## Compliance Management
+
+### Audit Preparation
+
+Ralph helps prepare for software audits:
+
+1. **Generate Reports** - Show purchased vs. assigned licenses
+2. **Gather Documentation** - Export license records with attachments
+3. **Verify Assignments** - Ensure all installations are documented
+4. **Identify Gaps** - Find unlicensed software or over-allocations
+
+### Ongoing Monitoring
+
+- Dashboard widgets for license status
+- Alerts for over-allocation
+- Regular compliance reports
+- Historical tracking for audits
+
+## Common Workflows
+
+### New Employee
+
+1. Create user account
+2. Assign required software licenses (OS, Office, etc.)
+3. Deploy laptop with licenses documented
+4. Track assignment in user profile
+
+### Software Deployment
+
+1. Check available licenses
+2. Deploy software to asset
+3. Assign license in Ralph
+4. Document in asset history
+
+### Employee Departure
+
+1. Retrieve equipment
+2. Remove license assignments in Ralph
+3. Reassign freed licenses to new users
+4. Update asset status
+
+### License Renewal
+
+1. Identify expiring licenses via report
+2. Process purchase for renewal
+3. Update license record with new validity dates
+4. Update serial number if keys changed
+
+<Card title="Next Steps" icon="arrow-right">
+  Learn about vendor support contract tracking in [Supports](/features/supports)
+</Card>

@@ -1,0 +1,381 @@
+---
+title: Customizing Ralph Admin
+description: Learn how to customize and extend the RalphAdmin class to build powerful admin interfaces
+---
+
+# Customizing Ralph Admin
+
+Ralph Admin (`ralph.admin.mixins.RalphAdmin`) extends Django's standard admin interface with powerful features for asset management. This guide covers how to customize admin classes for your models.
+
+## Overview
+
+RalphAdmin is built on top of Django Admin and includes:
+- Import/Export functionality
+- Autocomplete widgets
+- Custom filters and search
+- Bulk editing
+- Version control integration
+- Custom views and tabs
+- Permission management
+
+## Basic Admin Class
+
+Here's a minimal admin class:
+
+```python
+from ralph.admin import RalphAdmin, register
+from myapp.models import MyModel
+
+@register(MyModel)
+class MyModelAdmin(RalphAdmin):
+    list_display = ['name', 'status', 'created']
+    search_fields = ['name', 'description']
+    list_filter = ['status', 'created']
+```
+
+Source: `src/ralph/admin/mixins.py:458-470`
+
+## Import/Export Configuration
+
+### Resource Class
+
+Define a resource class to handle importing and exporting:
+
+```python
+from import_export import resources
+from ralph.admin import RalphAdmin, register
+
+class SupportResource(resources.ModelResource):
+    class Meta:
+        model = Support
+        fields = ['id', 'name', 'contract_id', 'date_from', 'date_to']
+        select_related = ['asset', 'supplier']
+        prefetch_related = ['base_objects']
+
+@register(Support)
+class SupportAdmin(RalphAdmin):
+    resource_class = SupportResource
+```
+
+Source: `src/ralph/admin/mixins.py:383-422`
+
+### Export Queryset Manager
+
+Use a custom manager for exports to optimize database queries:
+
+```python
+@register(MyModel)
+class MyModelAdmin(RalphAdmin):
+    _export_queryset_manager = 'objects_with_related'
+```
+
+This tells Ralph to use `MyModel.objects_with_related` instead of the default manager when exporting data.
+
+**Note:** Ralph automatically `select_related` and `prefetch_related` all related objects defined in your Resource's Meta.
+
+Source: `src/ralph/admin/mixins.py:383-409`
+
+## Custom Forms
+
+All forms must inherit from `RalphAdminFormMixin`:
+
+```python
+from ralph.admin.mixins import RalphAdminForm
+
+class MyModelForm(RalphAdminForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Customize fields
+        if 'hostname' in self.fields:
+            self.fields['hostname'].widget.attrs['readonly'] = True
+
+@register(MyModel)
+class MyModelAdmin(RalphAdmin):
+    form = MyModelForm
+```
+
+Source: `src/ralph/admin/mixins.py:135-144`
+
+## Autocomplete Fields
+
+Ralph uses autocomplete widgets for ForeignKey and ManyToMany fields by default:
+
+```python
+@register(MyModel)
+class MyModelAdmin(RalphAdmin):
+    # Fields that should use autocomplete widget
+    raw_id_fields = ['user', 'related_asset', 'tags']
+    
+    # Override parent model for autocomplete (if needed)
+    raw_id_override_parent = {
+        'related_asset': BaseAsset  # Use BaseAsset autocomplete instead
+    }
+```
+
+To disable autocomplete for a specific field:
+
+```python
+class MyModel(models.Model):
+    data_center = models.ForeignKey(DataCenter, verbose_name="data center")
+    data_center._autocomplete = False  # Use select widget instead
+```
+
+Source: `src/ralph/admin/mixins.py:93-133`, `docs/development/admin.md:204-214`
+
+## Advanced Search Filters
+
+Ralph provides specialized filter classes:
+
+```python
+from ralph.admin.filters import (
+    BooleanFilter,
+    ChoicesFilter, 
+    DateFilter,
+    TextFilter
+)
+from django.utils.translation import gettext_lazy as _
+
+class BarcodeFilter(TextFilter):
+    title = _('Barcode')
+    parameter_name = 'barcode'
+
+class StatusFilter(ChoicesFilter):
+    title = _('Status')
+    parameter_name = 'status'
+    choices_list = AssetStatus  # dj.choices.Choices instance
+
+@register(Asset)
+class AssetAdmin(RalphAdmin):
+    list_filter = [BarcodeFilter, StatusFilter, DateFilter]
+```
+
+Source: `docs/development/admin.md:168-190`
+
+### Custom Filter Titles
+
+Override the filter title for a field:
+
+```python
+class ServerRoom(models.Model):
+    data_center = models.ForeignKey(DataCenter, verbose_name=_("data center"))
+    data_center._filter_title = _('data center')  # Custom filter title
+```
+
+Source: `docs/development/admin.md:194-203`
+
+## Bulk Editing
+
+Enable bulk editing for specific fields:
+
+```python
+@register(Asset)
+class AssetAdmin(BulkEditChangeListMixin, RalphAdmin):
+    bulk_edit_list = ['status', 'service_env', 'remarks', 'location']
+    
+    # Fields that should not be fillable in bulk edit
+    bulk_edit_no_fillable = ['barcode', 'sn']
+```
+
+The `BulkEditChangeListMixin` automatically adds a "Bulk edit" action to the admin.
+
+Source: `src/ralph/admin/mixins.py:509-568`
+
+## Custom Views and Tabs
+
+Add custom tabs to the detail view:
+
+```python
+from ralph.admin.views.extra import RalphDetailViewAdmin, RalphDetailView
+from ralph.admin import RalphTabularInline
+
+class NetworkInline(RalphTabularInline):
+    model = IPAddress
+    extra = 1
+
+class NetworkView(RalphDetailViewAdmin):
+    icon = 'chain'
+    name = 'network'
+    label = 'Network'
+    url_name = 'network'
+    inlines = [NetworkInline]
+
+@register(Asset)
+class AssetAdmin(RalphAdmin):
+    change_views = [NetworkView]
+```
+
+For custom template views:
+
+```python
+class CustomView(RalphDetailView):
+    icon = 'chart'
+    name = 'custom_view'
+    label = 'Custom Report'
+    url_name = 'custom_report'
+    template_name = 'assets/custom_report.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['custom_data'] = self.calculate_custom_data()
+        return context
+
+@register(Asset)
+class AssetAdmin(RalphAdmin):
+    change_views = [CustomView]
+```
+
+Source: `docs/development/addons.md:8-114`
+
+## Queryset Customization
+
+Use a custom queryset manager:
+
+```python
+class MyModelManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            'owner', 'location'
+        ).prefetch_related('tags')
+
+class MyModel(models.Model):
+    objects = models.Manager()
+    objects_with_related = MyModelManager()
+
+@register(MyModel)
+class MyModelAdmin(RalphAdmin):
+    _queryset_manager = 'objects_with_related'
+```
+
+Source: `src/ralph/admin/mixins.py:377-381`
+
+## Permissions
+
+Ralph includes enhanced permission handling:
+
+```python
+@register(MyModel)
+class MyModelAdmin(RalphAdmin):
+    def has_view_permission(self, request, obj=None):
+        # Custom view permission logic
+        return super().has_view_permission(request, obj)
+    
+    def has_change_permission(self, request, obj=None):
+        # Anyone with view permission can access change form
+        # but actual changes require change permission
+        if obj:
+            return super().has_change_permission(request, obj)
+        else:
+            return self.has_view_permission(request, obj)
+```
+
+Source: `src/ralph/admin/mixins.py:263-273`
+
+## Inline Configuration
+
+Use Ralph's inline classes:
+
+```python
+from ralph.admin import RalphTabularInline, RalphStackedInline
+
+class ComponentInline(RalphTabularInline):
+    model = Component
+    extra = 1
+    raw_id_fields = ['component_type']
+    fields = ['component_type', 'serial_number', 'quantity']
+
+class DetailsInline(RalphStackedInline):
+    model = AssetDetails
+    fields = ['description', 'notes']
+
+@register(Asset)
+class AssetAdmin(RalphAdmin):
+    inlines = [ComponentInline, DetailsInline]
+```
+
+Source: `src/ralph/admin/mixins.py:476-492`
+
+## Templates
+
+Customize admin templates:
+
+```python
+@register(MyModel)
+class MyModelAdmin(RalphAdmin):
+    change_form_template = 'admin/myapp/mymodel/change_form.html'
+    change_list_template = 'admin/myapp/mymodel/change_list.html'
+```
+
+## Complete Example
+
+Here's a comprehensive admin class:
+
+```python
+from ralph.admin import RalphAdmin, RalphTabularInline, register
+from ralph.admin.filters import TextFilter, ChoicesFilter
+from ralph.admin.mixins import BulkEditChangeListMixin
+from ralph.admin.views.extra import RalphDetailViewAdmin
+from ralph.lib.custom_fields.admin import CustomFieldValueAdminMixin
+from ralph.lib.transitions.admin import TransitionAdminMixin
+from ralph.attachments.admin import AttachmentsMixin
+from myapp.models import Asset, AssetComponent
+from myapp.resources import AssetResource
+
+class BarcodeFilter(TextFilter):
+    title = 'Barcode'
+    parameter_name = 'barcode'
+
+class ComponentInline(RalphTabularInline):
+    model = AssetComponent
+    extra = 1
+    raw_id_fields = ['component_type']
+
+class ComponentsView(RalphDetailViewAdmin):
+    icon = 'cog'
+    name = 'components'
+    label = 'Components'
+    url_name = 'asset_components'
+    inlines = [ComponentInline]
+
+@register(Asset)
+class AssetAdmin(
+    BulkEditChangeListMixin,
+    TransitionAdminMixin,
+    AttachmentsMixin,
+    CustomFieldValueAdminMixin,
+    RalphAdmin
+):
+    resource_class = AssetResource
+    _export_queryset_manager = 'objects_with_related'
+    
+    list_display = ['hostname', 'barcode', 'model', 'status', 'location']
+    list_filter = [BarcodeFilter, 'status', 'model__category']
+    search_fields = ['hostname', 'barcode', 'sn']
+    
+    raw_id_fields = ['model', 'location', 'owner']
+    
+    bulk_edit_list = ['status', 'location', 'remarks']
+    bulk_edit_no_fillable = ['barcode', 'sn']
+    
+    change_views = [ComponentsView]
+    
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('hostname', 'barcode', 'sn', 'model')
+        }),
+        ('Location', {
+            'fields': ('location', 'rack', 'position')
+        }),
+        ('Additional', {
+            'fields': ('remarks', 'tags'),
+            'classes': ('collapse',)
+        }),
+    )
+```
+
+Source: `src/ralph/back_office/admin.py:83-100`, `src/ralph/data_center/admin.py:26-70`
+
+## Next Steps
+
+- Learn about [Custom Fields](/development/custom-fields) to add dynamic fields to your models
+- Explore [Transitions](/development/transitions) for workflow management
+- Check out [Addons](/development/addons) for extending Ralph with external applications

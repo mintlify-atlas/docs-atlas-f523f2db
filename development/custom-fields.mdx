@@ -1,0 +1,403 @@
+---
+title: Custom Fields System
+description: Add dynamic, configurable fields to your Ralph models without changing the database schema
+---
+
+# Custom Fields System
+
+Ralph's custom fields system allows you to add dynamic fields to models without modifying the database schema. This is useful for organization-specific data that doesn't fit into the core model structure.
+
+## Overview
+
+Custom fields are:
+- **Dynamic**: Created through the admin interface, no code changes required
+- **Typed**: Support string, integer, date, URL, and choice list types
+- **Inheritable**: Can be inherited from related objects
+- **API-enabled**: Automatically exposed in the REST API
+- **Permission-controlled**: Can be restricted to specific user groups
+
+## Adding Custom Fields to Models
+
+### Step 1: Add the Mixin
+
+Mix `WithCustomFieldsMixin` into your model:
+
+```python
+from django.db import models
+from ralph.lib.custom_fields.models import WithCustomFieldsMixin
+from ralph.lib.mixins.models import AdminAbsoluteUrlMixin
+
+class Asset(WithCustomFieldsMixin, AdminAbsoluteUrlMixin, models.Model):
+    hostname = models.CharField(max_length=255)
+    barcode = models.CharField(max_length=200, unique=True)
+    # ... other fields
+```
+
+Source: `src/ralph/lib/custom_fields/models.py:212-221`
+
+### Step 2: Enable Admin Integration
+
+Mix `CustomFieldValueAdminMixin` into your admin class:
+
+```python
+from ralph.admin import RalphAdmin, register
+from ralph.lib.custom_fields.admin import CustomFieldValueAdminMixin
+from myapp.models import Asset
+
+@register(Asset)
+class AssetAdmin(CustomFieldValueAdminMixin, RalphAdmin):
+    list_display = ['hostname', 'barcode', 'status']
+    # ... other admin configuration
+```
+
+Source: `src/ralph/lib/custom_fields/admin.py:67-84`
+
+### Step 3: Enable API Integration
+
+For Django Rest Framework, mix `WithCustomFieldsSerializerMixin` into your serializer:
+
+```python
+from rest_framework import serializers
+from ralph.lib.custom_fields.api import WithCustomFieldsSerializerMixin
+from myapp.models import Asset
+
+class AssetSerializer(WithCustomFieldsSerializerMixin, serializers.ModelSerializer):
+    class Meta:
+        model = Asset
+        fields = '__all__'
+```
+
+Source: `docs/development/custom-fields.md:12-14`
+
+## Field Types
+
+Ralph supports five custom field types:
+
+### String
+Plain text values:
+```python
+# Field configuration in admin:
+# Type: String
+# Default value: "N/A"
+```
+
+### Integer
+Numeric values:
+```python
+# Field configuration in admin:
+# Type: Integer
+# Default value: 0
+```
+
+### Date
+Date values (YYYY-MM-DD format):
+```python
+# Field configuration in admin:
+# Type: Date
+# Default value: 2024-01-01
+```
+
+### URL
+Validated URL values:
+```python
+# Field configuration in admin:
+# Type: URL
+# Default value: https://example.com
+```
+
+### Choice List
+Predefined choices separated by pipe (|):
+```python
+# Field configuration in admin:
+# Type: Choice List
+# Choices: Production|Staging|Development|Testing
+# Default value: Production
+```
+
+Source: `src/ralph/lib/custom_fields/models.py:23-48`
+
+## Creating Custom Fields
+
+Custom fields are created through the admin interface at `/admin/custom_fields/customfield/`:
+
+1. Navigate to **Custom Fields** in the admin
+2. Click **Add Custom Field**
+3. Fill in the details:
+   - **Name**: Display name (e.g., "Purchase Order Number")
+   - **Attribute Name**: Auto-generated slug (e.g., "purchase_order_number")
+   - **Type**: Select from String, Integer, Date, URL, or Choice List
+   - **Choices**: For Choice List type, enter options separated by `|`
+   - **Default Value**: Optional default value
+   - **Managing Group**: Restrict editing to specific group (optional)
+   - **Use as Configuration Variable**: Expose in API configuration_variables
+
+## Using Custom Fields
+
+### In Python Code
+
+Access custom field values:
+
+```python
+# Get all custom fields as a dictionary
+asset = Asset.objects.get(id=1)
+custom_data = asset.custom_fields_as_dict
+# {'Purchase Order': 'PO-12345', 'Warranty Expiry': '2025-12-31'}
+
+# Update a custom field
+asset.update_custom_field('Purchase Order', 'PO-67890')
+
+# Get configuration variables only
+config_vars = asset.custom_fields_configuration_variables
+```
+
+Source: `src/ralph/lib/custom_fields/models.py:222-242`
+
+### Direct QuerySet Access
+
+```python
+from ralph.lib.custom_fields.models import CustomField, CustomFieldValue
+
+# Get a specific custom field
+purchase_order_field = CustomField.objects.get(name='Purchase Order')
+
+# Find all assets with a specific custom field value
+assets_with_po = Asset.objects.filter(
+    custom_fields__custom_field=purchase_order_field,
+    custom_fields__value='PO-12345'
+)
+
+# Create a custom field value
+CustomFieldValue.objects.create(
+    custom_field=purchase_order_field,
+    object=asset,
+    value='PO-12345'
+)
+```
+
+Source: `src/ralph/lib/custom_fields/models.py:125-149`
+
+### In Templates
+
+Display custom fields in admin templates:
+
+```django
+{% for cfv in object.custom_fields.all %}
+    <div class="field">
+        <label>{{ cfv.custom_field.name }}:</label>
+        <span>{{ cfv.value }}</span>
+    </div>
+{% endfor %}
+```
+
+## Custom Field Inheritance
+
+Custom fields can be inherited from related objects. For example, a virtual server can inherit custom fields from its hypervisor:
+
+```python
+class Hypervisor(WithCustomFieldsMixin, models.Model):
+    name = models.CharField(max_length=255)
+    # No custom_fields_inheritance needed - this is the parent
+
+class VirtualServer(WithCustomFieldsMixin, models.Model):
+    name = models.CharField(max_length=255)
+    hypervisor = models.ForeignKey(Hypervisor, on_delete=models.CASCADE)
+    
+    # Define inheritance path
+    custom_fields_inheritance = {
+        'hypervisor': 'myapp.Hypervisor'
+    }
+```
+
+Now when you access `virtual_server.custom_fields.all()`, it returns both:
+- Custom fields set directly on the virtual server
+- Custom fields inherited from its hypervisor
+
+Source: `src/ralph/lib/custom_fields/models.py:190-210`
+
+### Clearing Inherited Values
+
+When a parent object's custom field is deleted, you can clear it from child objects:
+
+```python
+# This is handled automatically when using the admin interface
+hypervisor.clear_children_custom_field_value(custom_field)
+```
+
+Source: `src/ralph/lib/custom_fields/models.py:244-265`
+
+## Permission Management
+
+Restrict custom field editing to specific groups:
+
+```python
+# In admin, when creating/editing a custom field:
+# Managing Group: IT Administrators
+```
+
+When a managing group is set:
+- Only users in that group can create/edit/delete values for this field
+- Other users can still view the field values
+- Useful for sensitive data like license keys or compliance information
+
+Source: `src/ralph/lib/custom_fields/models.py:75-84`
+
+## Configuration Variables
+
+Mark custom fields as configuration variables to expose them in the API:
+
+```python
+# In admin, when creating/editing a custom field:
+# Use as Configuration Variable: ✓ (checked)
+```
+
+These fields are then available in API responses under `configuration_variables`:
+
+```json
+{
+  "id": 123,
+  "hostname": "server01",
+  "configuration_variables": {
+    "ENVIRONMENT": "production",
+    "APP_VERSION": "2.1.0",
+    "MONITORING_ENABLED": "true"
+  }
+}
+```
+
+This is useful for configuration management tools like Ansible or Puppet.
+
+Source: `src/ralph/lib/custom_fields/models.py:86-93`, `src/ralph/lib/custom_fields/models.py:229-236`
+
+## Admin Interface Features
+
+### Custom Field Values Summary
+
+The admin shows a summary of all custom field values, including inherited ones:
+
+```python
+@register(Asset)
+class AssetAdmin(CustomFieldValueAdminMixin, RalphAdmin):
+    # Show summary of custom field values (default: True)
+    show_custom_fields_values_summary = True
+```
+
+The summary displays:
+- Field name
+- Current value
+- Source object (if inherited)
+- Link to source object
+
+Source: `src/ralph/lib/custom_fields/admin.py:67-133`
+
+### Inline Editing
+
+Custom fields appear as an inline formset in the change form, allowing you to:
+- Add new custom field values
+- Edit existing values
+- Delete custom field values
+- Clear inherited values (if applicable)
+
+Source: `src/ralph/lib/custom_fields/admin.py:55-65`
+
+## Data Model
+
+### CustomField Model
+
+Defines the custom field configuration:
+
+```python
+class CustomField(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    attribute_name = models.SlugField(max_length=255, unique=True)  # auto-generated
+    type = models.PositiveIntegerField(choices=CustomFieldTypes())
+    choices = models.TextField(null=True, blank=True)  # for choice lists
+    default_value = models.CharField(max_length=1000)
+    managing_group = models.ForeignKey(Group, null=True, blank=True)
+    use_as_configuration_variable = models.BooleanField(default=False)
+```
+
+Source: `src/ralph/lib/custom_fields/models.py:50-95`
+
+### CustomFieldValue Model
+
+Stores the actual values:
+
+```python
+class CustomFieldValue(models.Model):
+    custom_field = models.ForeignKey(CustomField)
+    value = models.CharField(max_length=1000)  # stored as string
+    content_type = models.ForeignKey(ContentType)  # generic relation
+    object_id = models.PositiveIntegerField()
+    object = GenericForeignKey('content_type', 'object_id')
+    
+    class Meta:
+        unique_together = ('custom_field', 'content_type', 'object_id')
+```
+
+Source: `src/ralph/lib/custom_fields/models.py:125-149`
+
+## Best Practices
+
+1. **Use descriptive names**: "Purchase Order Number" instead of "PO Num"
+2. **Choose appropriate types**: Use Integer for numbers, Date for dates, etc.
+3. **Set defaults wisely**: Provide sensible defaults to reduce data entry
+4. **Use managing groups**: Protect sensitive fields from unauthorized edits
+5. **Mark config variables**: Only mark fields as configuration variables if they're needed by external tools
+6. **Avoid overuse**: Don't replace proper model fields with custom fields for core functionality
+
+## Complete Example
+
+Here's a complete example of adding custom fields to an Asset model:
+
+```python
+# models.py
+from django.db import models
+from ralph.lib.custom_fields.models import WithCustomFieldsMixin
+from ralph.lib.mixins.models import AdminAbsoluteUrlMixin, TimeStampMixin
+
+class Asset(WithCustomFieldsMixin, AdminAbsoluteUrlMixin, TimeStampMixin, models.Model):
+    hostname = models.CharField(max_length=255)
+    barcode = models.CharField(max_length=200, unique=True)
+    status = models.PositiveIntegerField(choices=AssetStatus())
+    
+    class Meta:
+        verbose_name = 'Asset'
+        verbose_name_plural = 'Assets'
+
+# admin.py
+from ralph.admin import RalphAdmin, register
+from ralph.lib.custom_fields.admin import CustomFieldValueAdminMixin
+from myapp.models import Asset
+
+@register(Asset)
+class AssetAdmin(CustomFieldValueAdminMixin, RalphAdmin):
+    list_display = ['hostname', 'barcode', 'status']
+    search_fields = ['hostname', 'barcode']
+    list_filter = ['status']
+    
+    # Show custom field summary in change form
+    show_custom_fields_values_summary = True
+
+# serializers.py (for API)
+from rest_framework import serializers
+from ralph.lib.custom_fields.api import WithCustomFieldsSerializerMixin
+from myapp.models import Asset
+
+class AssetSerializer(WithCustomFieldsSerializerMixin, serializers.ModelSerializer):
+    class Meta:
+        model = Asset
+        fields = ['id', 'hostname', 'barcode', 'status']
+        # custom_fields and configuration_variables are added automatically
+```
+
+Now you can:
+1. Create custom fields in the admin at `/admin/custom_fields/customfield/`
+2. Add custom field values when editing assets
+3. Access values via `asset.custom_fields_as_dict` in Python
+4. See custom fields in API responses automatically
+
+## Next Steps
+
+- Learn about [RalphAdmin customization](/development/admin) for more admin features
+- Explore [Transitions](/development/transitions) for workflow management
+- Check out the [API documentation](/development/api) for API integration

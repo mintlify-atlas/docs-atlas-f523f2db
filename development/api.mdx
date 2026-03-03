@@ -1,0 +1,298 @@
+---
+title: Internal API Architecture
+description: Learn about Ralph's internal API architecture using Django REST Framework, including viewsets, serializers, and custom filters.
+---
+
+Ralph's API is built on Django REST Framework and provides a comprehensive REST API for all core models. The API architecture follows consistent patterns and includes built-in features for permissions, filtering, and serialization.
+
+## Quick Start
+
+Create a new API resource in three simple steps:
+
+```python
+# models.py
+from django.db import models
+
+class Foo(models.Model):
+    bar = models.CharField(max_length=10)
+
+# api.py
+from ralph.api import RalphAPISerializer, RalphAPIViewSet, router
+
+class FooSerializer(RalphAPISerializer):
+    class Meta:
+        model = Foo
+
+class FooViewSet(RalphAPIViewSet):
+    queryset = Foo.objects.all()
+    serializer_class = FooSerializer
+
+# Register the viewset
+router.register(r'foos', FooViewSet)
+```
+
+See `src/ralph/api/__init__.py:1` for available base classes.
+
+## Core Components
+
+### RalphAPISerializer
+
+The base serializer class provides comprehensive features for Ralph models.
+
+**Built-in Features:**
+
+- **Automatic URL and PK fields**: Both object primary key and URL are included automatically (see `ralph.api.serializers.RalphAPISerializer.get_default_field_names:34` for implementation)
+
+- **Context propagation**: Every sub-serializer has the current context set, even when instantiated directly as a field
+
+- **Reversed choice fields**: All choice fields use `ReversedChoiceField`, allowing values by name instead of key. Works seamlessly with `dj.choices.Choices`
+
+- **Field-level permissions**: Uses `PermissionsPerFieldSerializerMixin` to return only fields the user has access to. View-only permissions are handled as read-only fields
+
+- **Object-level permissions for relations**: Related field models with object-level permissions only show accessible objects
+
+- **Model validation**: Data is validated using the model's `clean()` method. Disable with `_validate_using_model_clean = False` in your serializer
+
+**Example with Advanced Features:**
+
+```python
+from ralph.api import RalphAPISerializer
+from rest_framework import serializers
+
+class CloudHostSerializer(BaseObjectSerializer):
+    # Nested serializers maintain context
+    hypervisor = DataCenterAssetSimpleSerializer()
+    parent = CloudProjectSimpleSerializer(source="cloudproject")
+    
+    # Custom fields
+    cores = serializers.IntegerField()
+    memory = serializers.IntegerField()
+    
+    class Meta(BaseObjectSerializer.Meta):
+        model = CloudHost
+        depth = 1
+```
+
+See `src/ralph/virtual/api.py:119` for a real implementation.
+
+### RalphAPISaveSerializer
+
+For write operations (POST, PUT, PATCH), use `RalphAPISaveSerializer` which simplifies relation handling:
+
+```python
+from ralph.api.serializers import RalphAPISaveSerializer
+from rest_framework import relations
+
+class SaveCloudHostSerializer(RalphAPISaveSerializer):
+    _validate_using_model_clean = False
+    ip_addresses = serializers.ListField()
+    cores = serializers.IntegerField(required=False)
+    
+    def create(self, validated_data):
+        ip_addresses = validated_data.pop('ip_addresses')
+        instance = super().create(validated_data)
+        instance.ip_addresses = ip_addresses
+        return instance
+    
+    class Meta:
+        model = CloudHost
+        exclude = ['content_type']
+```
+
+See `src/ralph/virtual/api.py:84` for the complete example.
+
+### RalphAPIViewSet
+
+The base viewset class handles permissions, filtering, and query optimization.
+
+**Built-in Features:**
+
+- **Automatic save serializer**: Default serializer for POST/PUT/PATCH uses `PrimaryKeyRelatedField` for all relations. Override with `save_serializer_class` attribute
+
+- **Query optimization**: Includes `QuerysetRelatedMixin` for easy `select_related` and `prefetch_related`. Defaults to admin site's `list_select_related`
+
+- **Admin integration**: Through `AdminSearchFieldsMixin`, search fields are automatically taken from the related admin site
+
+- **Comprehensive permissions**: Includes `RalphPermission` checking:
+  - User authentication (`IsAuthenticated`)
+  - Object-level permissions (`ObjectPermissionsMixin`)
+  - Django admin permissions (`add_*`, `change_*`, `delete_*`)
+
+**Example ViewSet:**
+
+```python
+from ralph.api import RalphAPIViewSet
+
+class CloudHostViewSet(BaseObjectViewSetMixin, RalphAPIViewSet):
+    queryset = CloudHost.objects.all()
+    serializer_class = CloudHostSerializer
+    save_serializer_class = SaveCloudHostSerializer
+    
+    select_related = [
+        'parent',
+        'cloudprovider',
+        'hypervisor',
+        'service_env__service',
+    ]
+    
+    prefetch_related = [
+        'tags',
+        'licences',
+        Prefetch('ethernet_set', 
+                 queryset=Ethernet.objects.select_related('ipaddress')),
+    ]
+    
+    filterset_fields = [
+        'service_env__service__uid',
+        'service_env__service__name',
+    ]
+```
+
+See `src/ralph/virtual/api.py:249` for the complete implementation.
+
+## Filter Backends
+
+`RalphAPIViewSet` includes powerful filtering capabilities through multiple filter backends:
+
+### DjangoFilterBackend
+
+Provides basic filtering for Django models. Filter fields are automatically associated with the model's admin configuration.
+
+### PermissionsForObjectFilter
+
+Limits results to objects the user has at least view permission for.
+
+### ExtendedFiltersBackend
+
+Allows filtering multiple fields using a single query parameter. Especially useful for polymorphic models:
+
+```python
+class CloudHostViewSet(RalphAPIViewSet):
+    extended_filter_fields = {
+        'name': ['asset__hostname', 'ip__address', 'cloudhost__hostname']
+    }
+```
+
+Query: `GET /api/cloud-hosts/?name=abc` resolves to:
+```python
+Q(asset__hostname=abc) | Q(ip__address=abc) | Q(cloudhost__hostname=abc)
+```
+
+See `src/ralph/virtual/api.py:277` for an example.
+
+### LookupFilterBackend
+
+Filter by Django lookups using `__` convention:
+
+```
+GET /api/assets/?barcode__startswith=123
+GET /api/assets/?invoice_date__lte=2015-01-01
+```
+
+### TagsFilterBackend
+
+Filter queryset by tags. Multiple tags can be specified:
+
+```
+GET /api/assets/?tag=production&tag=datacenter&tag=critical
+```
+
+### OrderingFilter
+
+Order queryset using the `ordering` URL parameter:
+
+```
+GET /api/assets/?ordering=hostname
+GET /api/assets/?ordering=-created_date
+```
+
+## Polymorphic Models
+
+Polymorphic models automatically support lookup filters and extended filters:
+
+```python
+GET /api/base-objects/?name__startswith=abc
+```
+
+This query checks all fields defined in `extended_filter_fields` (`asset__hostname`, `ip__address`, `cloudhost__hostname`) to see if any start with "abc".
+
+## Router Registration
+
+All viewsets must be registered with Ralph's router:
+
+```python
+from ralph.api import router
+
+router.register(r'cloud-hosts', CloudHostViewSet)
+router.register(r'virtual-servers', VirtualServerViewSet)
+```
+
+See `src/ralph/virtual/api.py:353` for registration examples.
+
+## Advanced Patterns
+
+### Custom Destroy Logic
+
+Implement custom deletion behavior with force delete option:
+
+```python
+from rest_framework import status
+from rest_framework.response import Response
+from ralph.lib.api.exceptions import Conflict
+
+class CloudFlavorViewSet(RalphAPIViewSet):
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        force_delete = request.data.get('force', False)
+        
+        if instance.cloudhost_set.count() != 0 and not force_delete:
+            raise Conflict(
+                'Cloud flavor is in use. '
+                'Use {"force": true} to force deletion.'
+            )
+        
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+```
+
+See `src/ralph/virtual/api.py:200` for the implementation.
+
+### Query Annotations
+
+Add computed fields to querysets:
+
+```python
+from django.db.models import Subquery, OuterRef
+
+class VirtualServerViewSet(RalphAPIViewSet):
+    def get_queryset(self):
+        DataCenterAsset = apps.get_model('data_center', 'DataCenterAsset')
+        dca_sub = DataCenterAsset.objects.filter(id=OuterRef('parent_id'))
+        return (
+            super()
+            .get_queryset()
+            .annotate(parent_hostname=Subquery(dca_sub.values('hostname')[:1]))
+        )
+```
+
+See `src/ralph/virtual/api.py:343` for the complete example.
+
+## Best Practices
+
+1. **Always use Ralph base classes**: Use `RalphAPISerializer` and `RalphAPIViewSet` for consistency and built-in features
+
+2. **Optimize queries**: Define `select_related` and `prefetch_related` to avoid N+1 queries
+
+3. **Separate read/write serializers**: Use `serializer_class` for reads and `save_serializer_class` for writes
+
+4. **Leverage extended filters**: For polymorphic models, define `extended_filter_fields` to enable unified searching
+
+5. **Test permissions**: Ensure field-level and object-level permissions are working as expected
+
+6. **Document custom endpoints**: Add docstrings to custom actions and methods
+
+## Related Documentation
+
+- [Custom Fields](/development/custom-fields) - Adding custom fields to models
+- [Permissions](/development/admin) - Understanding Ralph's permission system
+- [Admin Customization](/development/admin) - Customizing the admin interface

@@ -1,0 +1,621 @@
+---
+title: Transitions & Workflows
+description: Implement state machines and workflows with Ralph's transition system for lifecycle management
+---
+
+# Transitions & Workflows
+
+Ralph's transition system allows you to define workflows that change the state of objects (like assets, licenses, or support contracts) from one status to another. This enables structured lifecycle management with custom actions, validations, and permissions.
+
+## Overview
+
+Transitions provide:
+- **State management**: Control how objects move between states
+- **Custom actions**: Execute code when transitions occur
+- **Validation**: Ensure preconditions are met before transitions
+- **Permissions**: Control who can execute transitions
+- **History tracking**: Audit trail of all transitions
+- **Async execution**: Run long-running transitions in the background
+- **Attachments**: Attach files generated during transitions
+
+## Basic Setup
+
+### Step 1: Define Status Field
+
+Create a model with a `TransitionField`:
+
+```python
+from django.db import models
+from ralph.lib.dj_choices import Choices
+from ralph.lib.transitions.fields import TransitionField
+from ralph.lib.transitions.models import TransitionWorkflowBase
+
+class OrderStatus(Choices):
+    _ = Choices.Choice
+    
+    NEW = _('New')
+    PROCESSING = _('Processing')
+    PACKED = _('Packed')
+    SHIPPED = _('Shipped')
+    DELIVERED = _('Delivered')
+    CANCELLED = _('Cancelled')
+
+class Order(models.Model, metaclass=TransitionWorkflowBase):
+    name = models.CharField(max_length=255)
+    status = TransitionField(
+        default=OrderStatus.NEW.id,
+        choices=OrderStatus(),
+    )
+    customer = models.ForeignKey('Customer', on_delete=models.CASCADE)
+    created = models.DateTimeField(auto_now_add=True)
+```
+
+Source: `src/ralph/lib/transitions/models.py:465-487`, `docs/development/transitions.md:17-33`
+
+### Step 2: Define Actions
+
+Use the `@transition_action` decorator to define actions:
+
+```python
+from ralph.lib.transitions.decorators import transition_action
+
+class Order(models.Model, metaclass=TransitionWorkflowBase):
+    status = TransitionField(
+        default=OrderStatus.NEW.id,
+        choices=OrderStatus(),
+    )
+    
+    @classmethod
+    @transition_action
+    def pack(cls, instances, request, **kwargs):
+        """Pack the order for shipping."""
+        for instance in instances:
+            # Your custom logic here
+            notify_warehouse(f'Pack order {instance.name}')
+            instance.packed_at = timezone.now()
+    
+    @classmethod
+    @transition_action(
+        verbose_name='Ship to Customer'
+    )
+    def ship(cls, instances, request, **kwargs):
+        """Ship the order to customer."""
+        for instance in instances:
+            carrier = assign_shipping_carrier(instance)
+            notify_customer(
+                f'Order {instance.name} shipped via {carrier}'
+            )
+            instance.shipped_at = timezone.now()
+```
+
+Source: `src/ralph/lib/transitions/decorators.py:7-41`, `docs/development/transitions.md:24-33`
+
+### Step 3: Configure Transitions in Admin
+
+After defining actions, they appear in the admin. Navigate to **Transitions → Transition Models** and configure:
+
+1. Select your model and field (e.g., Order → status)
+2. Create transitions:
+   - **Name**: "Process Order"
+   - **Source**: [New]
+   - **Target**: Processing
+   - **Actions**: [pack]
+
+Source: `src/ralph/lib/transitions/models.py:511-544`, `docs/development/transitions.md:35-37`
+
+### Step 4: Enable in Admin
+
+Mix `TransitionAdminMixin` into your admin class:
+
+```python
+from ralph.admin import RalphAdmin, register
+from ralph.lib.transitions.admin import TransitionAdminMixin
+from myapp.models import Order
+
+@register(Order)
+class OrderAdmin(TransitionAdminMixin, RalphAdmin):
+    list_display = ['name', 'status', 'customer', 'created']
+    list_filter = ['status']
+    
+    # Show transition history tab (default: True)
+    show_transition_history = True
+```
+
+Source: `src/ralph/lib/transitions/admin.py:64-140`
+
+## Action Parameters
+
+### Form Fields
+
+Add input fields to collect data during transitions:
+
+```python
+from django import forms
+from ralph.lib.transitions.decorators import transition_action
+
+@classmethod
+@transition_action(
+    form_fields={
+        'tracking_number': {
+            'field': forms.CharField(max_length=100),
+        },
+        'carrier': {
+            'field': forms.ChoiceField(
+                choices=[('ups', 'UPS'), ('fedex', 'FedEx'), ('dhl', 'DHL')]
+            ),
+        },
+        'estimated_delivery': {
+            'field': forms.DateField(),
+        }
+    }
+)
+def ship(cls, instances, request, tracking_number, carrier, estimated_delivery, **kwargs):
+    """Ship order with tracking information."""
+    for instance in instances:
+        instance.tracking_number = tracking_number
+        instance.carrier = carrier
+        instance.estimated_delivery = estimated_delivery
+        send_tracking_email(instance)
+```
+
+Source: `docs/development/transitions.md:42-64`
+
+### Conditional Fields
+
+Show fields only when conditions are met:
+
+```python
+ALLOW_COMMENT = True
+
+@classmethod
+@transition_action(
+    form_fields={
+        'comment': {
+            'field': forms.CharField(widget=forms.Textarea),
+            'condition': lambda obj: (obj.status > 2) and ALLOW_COMMENT
+        },
+        'priority': {
+            'field': forms.BooleanField(required=False),
+            'condition': lambda obj: obj.customer.is_vip
+        }
+    }
+)
+def pack(cls, instances, request, comment=None, priority=False, **kwargs):
+    """Pack order with optional comment."""
+    for instance in instances:
+        if comment:
+            instance.packing_notes = comment
+        if priority:
+            instance.priority_shipping = True
+        notify_warehouse(instance)
+```
+
+Source: `docs/development/transitions.md:45-62`
+
+### Excluding from History
+
+Prevent sensitive fields from being saved to transition history:
+
+```python
+@classmethod
+@transition_action(
+    form_fields={
+        'credit_card': {
+            'field': forms.CharField(max_length=16),
+            'exclude_from_history': True  # Don't save to history
+        },
+        'amount': {
+            'field': forms.DecimalField(),
+        }
+    }
+)
+def process_payment(cls, instances, request, credit_card, amount, **kwargs):
+    """Process payment for order."""
+    for instance in instances:
+        charge_payment(credit_card, amount)
+        instance.payment_status = 'paid'
+```
+
+Source: `src/ralph/lib/transitions/models.py:90-100`
+
+## Advanced Features
+
+### Preconditions
+
+Validate before executing transitions:
+
+```python
+def check_inventory(instances, requester):
+    """Check if items are in stock."""
+    errors = {}
+    for instance in instances:
+        if not instance.items_in_stock():
+            errors[instance] = 'Items out of stock'
+    return errors
+
+@classmethod
+@transition_action(
+    precondition=check_inventory,
+    verbose_name='Pack Order'
+)
+def pack(cls, instances, request, **kwargs):
+    """Pack order (only if items in stock)."""
+    for instance in instances:
+        instance.pack_items()
+```
+
+If precondition returns errors, the transition is blocked and error messages are shown to the user.
+
+Source: `src/ralph/lib/transitions/decorators.py:16`, `src/ralph/lib/transitions/models.py:152-195`
+
+### Action Dependencies
+
+Run actions in specific order:
+
+```python
+@classmethod
+@transition_action
+def validate_order(cls, instances, request, **kwargs):
+    """Validate order details."""
+    for instance in instances:
+        instance.validate()
+
+@classmethod
+@transition_action
+def allocate_inventory(cls, instances, request, **kwargs):
+    """Allocate items from inventory."""
+    for instance in instances:
+        instance.allocate_items()
+
+@classmethod
+@transition_action(
+    run_after=['validate_order', 'allocate_inventory']
+)
+def create_invoice(cls, instances, request, **kwargs):
+    """Create invoice after validation and allocation."""
+    for instance in instances:
+        instance.generate_invoice()
+```
+
+Actions are executed in topological order based on dependencies.
+
+Source: `src/ralph/lib/transitions/decorators.py:14`, `src/ralph/lib/transitions/models.py:237-254`
+
+### Transition History
+
+Store additional data in history:
+
+```python
+@classmethod
+@transition_action
+def assign_courier(cls, instances, request, **kwargs):
+    """Assign courier for delivery."""
+    history_kwargs = kwargs.get('history_kwargs', {})
+    
+    for instance in instances:
+        courier = get_available_courier(instance.location)
+        instance.courier = courier
+        
+        # Store in history
+        history_kwargs[instance.pk]['courier_name'] = courier.name
+        history_kwargs[instance.pk]['assignment_time'] = timezone.now().isoformat()
+```
+
+History data is saved and displayed in the transition history tab.
+
+Source: `docs/development/transitions.md:74-85`
+
+### Sharing Data Between Actions
+
+Pass data between consecutive actions:
+
+```python
+@classmethod
+@transition_action
+def calculate_shipping(cls, instances, request, **kwargs):
+    """Calculate shipping cost."""
+    shared_params = kwargs.get('shared_params', {})
+    
+    for instance in instances:
+        cost = calculate_cost(instance)
+        shared_params[instance.pk]['shipping_cost'] = cost
+
+@classmethod
+@transition_action(
+    run_after=['calculate_shipping']
+)
+def send_invoice(cls, instances, request, **kwargs):
+    """Send invoice including shipping cost."""
+    shared_params = kwargs.get('shared_params', {})
+    
+    for instance in instances:
+        shipping_cost = shared_params[instance.pk]['shipping_cost']
+        send_invoice_email(instance, shipping_cost)
+```
+
+Source: `docs/development/transitions.md:87-90`
+
+### Return Attachments
+
+Generate and return files from transitions:
+
+```python
+from ralph.attachments.models import Attachment
+
+@classmethod
+@transition_action(
+    return_attachment=True
+)
+def generate_shipping_label(cls, instances, request, **kwargs):
+    """Generate PDF shipping label."""
+    attachments = []
+    
+    for instance in instances:
+        pdf_content = create_shipping_label_pdf(instance)
+        
+        attachment = Attachment.objects.create(
+            file=ContentFile(pdf_content, name=f'label_{instance.id}.pdf'),
+            description=f'Shipping label for {instance.name}'
+        )
+        attachments.append(attachment)
+    
+    return attachments
+```
+
+Attachments are automatically linked to the transition history and available for download.
+
+Source: `docs/development/transitions.md:72`, `src/ralph/lib/transitions/models.py:423-428`
+
+### Asynchronous Transitions
+
+Run long-running transitions in the background:
+
+```python
+@classmethod
+@transition_action(
+    is_async=True,
+    verbose_name='Process Bulk Import'
+)
+def import_items(cls, instances, request, **kwargs):
+    """Import items from external system (runs async)."""
+    for instance in instances:
+        # This runs in background worker
+        items = fetch_from_external_api(instance.external_id)
+        for item in items:
+            instance.items.create(**item)
+        instance.import_completed = True
+```
+
+Async transitions:
+- Run in background workers
+- Show progress in "Current Transitions" tab
+- Can be monitored and cancelled
+- Only one async transition per object at a time
+
+Source: `src/ralph/lib/transitions/decorators.py:22`, `src/ralph/lib/transitions/models.py:256-305`
+
+### Rescheduling Async Actions
+
+Reschedule actions to run later:
+
+```python
+from ralph.lib.transitions.exceptions import RescheduleAsyncTransitionActionLater
+
+@classmethod
+@transition_action(is_async=True)
+def wait_for_external_approval(cls, instances, request, **kwargs):
+    """Wait for external system approval."""
+    for instance in instances:
+        approval = check_external_approval_status(instance)
+        
+        if not approval.ready:
+            # Reschedule to check again later
+            raise RescheduleAsyncTransitionActionLater(
+                'Approval not ready, will retry'
+            )
+        
+        instance.approval_code = approval.code
+        instance.approved_at = timezone.now()
+```
+
+Rescheduled actions preserve `history_kwargs` and `shared_params`.
+
+Source: `docs/development/transitions.md:92-96`
+
+### Disable Auto-Save
+
+Prevent automatic saving of instances:
+
+```python
+@classmethod
+@transition_action(
+    disable_save_object=True
+)
+def preview_changes(cls, instances, request, **kwargs):
+    """Preview changes without saving."""
+    for instance in instances:
+        # Modify instance but don't save
+        instance.estimated_total = instance.calculate_total()
+        # Instance is NOT saved automatically
+```
+
+Useful for validation-only transitions or when you need custom save logic.
+
+Source: `src/ralph/lib/transitions/decorators.py:20`
+
+## Custom Templates
+
+Use custom templates for transition forms:
+
+```python
+# In settings.py
+TRANSITION_TEMPLATES = [
+    ('transitions/blue_theme.html', 'Blue Theme'),
+    ('transitions/red_theme.html', 'Red Theme'),
+    ('transitions/minimal.html', 'Minimal Layout'),
+]
+```
+
+Then in the admin, select the template when configuring the transition.
+
+Source: `docs/development/transitions.md:4-12`
+
+## Permissions
+
+Each transition automatically gets a permission:
+
+```python
+# Permission is auto-created as:
+# "Can run {transition_name} transition"
+# Codename: "can_run_{slugified_transition_name}_transition"
+```
+
+Assign permissions to users/groups in Django admin to control who can execute transitions.
+
+Source: `src/ralph/lib/transitions/models.py:545-551`, `src/ralph/lib/transitions/models.py:776-786`
+
+## Programmatic Execution
+
+Run transitions from Python code:
+
+```python
+from ralph.lib.transitions.models import run_transition
+
+# Run transition by name
+order = Order.objects.get(id=123)
+success, attachments = run_transition(
+    instances=[order],
+    transition_obj_or_name='Pack Order',
+    field='status',
+    requester=request.user,
+    data={
+        'tracking_number': 'TRK123456',
+        'carrier': 'ups'
+    }
+)
+
+if success:
+    print('Transition executed successfully')
+else:
+    print('Transition failed')
+```
+
+Source: `src/ralph/lib/transitions/models.py:256-305`
+
+## Available Transitions
+
+Get available transitions for an object:
+
+```python
+# Get transitions for specific field
+available = order.get_available_transitions_for_status(user=request.user)
+
+for transition in available:
+    print(f'{transition.name}: {transition.source} → {transition.target}')
+```
+
+This method is auto-generated for each `TransitionField` on the model.
+
+Source: `src/ralph/lib/transitions/models.py:442-462`, `src/ralph/lib/transitions/models.py:473-486`
+
+## Complete Example
+
+Here's a full example of an order management system:
+
+```python
+# models.py
+from django.db import models
+from django.utils import timezone
+from ralph.lib.dj_choices import Choices
+from ralph.lib.transitions.fields import TransitionField
+from ralph.lib.transitions.models import TransitionWorkflowBase
+from ralph.lib.transitions.decorators import transition_action
+from ralph.lib.mixins.models import AdminAbsoluteUrlMixin, TimeStampMixin
+
+class OrderStatus(Choices):
+    _ = Choices.Choice
+    NEW = _('New')
+    PROCESSING = _('Processing') 
+    PACKED = _('Packed')
+    SHIPPED = _('Shipped')
+    DELIVERED = _('Delivered')
+    CANCELLED = _('Cancelled')
+
+class Order(AdminAbsoluteUrlMixin, TimeStampMixin, models.Model, metaclass=TransitionWorkflowBase):
+    name = models.CharField(max_length=255)
+    customer = models.ForeignKey('Customer', on_delete=models.CASCADE)
+    status = TransitionField(
+        default=OrderStatus.NEW.id,
+        choices=OrderStatus(),
+    )
+    tracking_number = models.CharField(max_length=100, blank=True)
+    shipped_at = models.DateTimeField(null=True, blank=True)
+    
+    def items_in_stock(self):
+        return all(item.in_stock for item in self.items.all())
+    
+    @classmethod
+    @transition_action(
+        verbose_name='Validate and Process',
+        precondition=lambda instances, requester: {
+            instance: 'Items out of stock'
+            for instance in instances
+            if not instance.items_in_stock()
+        }
+    )
+    def process_order(cls, instances, request, **kwargs):
+        for instance in instances:
+            instance.allocate_items()
+            notify_warehouse(instance)
+    
+    @classmethod
+    @transition_action(
+        form_fields={
+            'tracking_number': {'field': forms.CharField()},
+            'carrier': {'field': forms.ChoiceField(
+                choices=[('ups', 'UPS'), ('fedex', 'FedEx')]
+            )}
+        },
+        return_attachment=True
+    )
+    def ship_order(cls, instances, request, tracking_number, carrier, **kwargs):
+        attachments = []
+        for instance in instances:
+            instance.tracking_number = tracking_number
+            instance.carrier = carrier
+            instance.shipped_at = timezone.now()
+            
+            # Generate shipping label
+            pdf = create_shipping_label(instance)
+            attachment = Attachment.objects.create(
+                file=ContentFile(pdf, name=f'label_{instance.id}.pdf')
+            )
+            attachments.append(attachment)
+            
+            send_tracking_email(instance)
+        return attachments
+
+# admin.py
+from ralph.admin import RalphAdmin, register
+from ralph.lib.transitions.admin import TransitionAdminMixin
+
+@register(Order)
+class OrderAdmin(TransitionAdminMixin, RalphAdmin):
+    list_display = ['name', 'customer', 'status', 'created']
+    list_filter = ['status']
+    search_fields = ['name', 'tracking_number']
+    show_transition_history = True
+```
+
+Now configure transitions in the admin:
+1. **Process Order**: NEW → PROCESSING (action: process_order)
+2. **Pack Order**: PROCESSING → PACKED (action: pack_order)
+3. **Ship Order**: PACKED → SHIPPED (action: ship_order)
+4. **Mark Delivered**: SHIPPED → DELIVERED (no actions)
+5. **Cancel Order**: [NEW, PROCESSING] → CANCELLED (action: cancel_order)
+
+## Next Steps
+
+- Learn about [RalphAdmin customization](/development/admin) for admin interface features
+- Explore [Custom Fields](/development/custom-fields) for dynamic field management
+- Check out [Addons](/development/addons) for extending Ralph with plugins

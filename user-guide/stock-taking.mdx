@@ -1,0 +1,372 @@
+---
+title: Stock Taking (Inventory Verification)
+description: Enable employees to verify their assigned equipment through self-service stock-taking
+---
+
+Ralph's stock-taking feature streamlines the inventory verification process by allowing employees to confirm their assigned assets quickly through a self-service interface.
+
+## Overview
+
+Stock-taking provides:
+
+- **Self-service verification** - Employees confirm their own equipment
+- **Automated tagging** - Assets are tagged automatically upon confirmation
+- **Warehouse-based** - Enable per warehouse or region
+- **Audit trail** - All confirmations recorded in asset history
+- **Missing asset reporting** - Track items that can't be located
+
+## Enabling Stock Taking
+
+Stock-taking can be enabled at two levels:
+
+### Warehouse Level
+
+<Steps>
+  <Step title="Navigate to Warehouses">
+    Go to **Back Office → Warehouses** or visit `/back_office/warehouse/`
+  </Step>
+  
+  <Step title="Edit Warehouse">
+    Select the warehouse where you want to enable stock-taking.
+  </Step>
+  
+  <Step title="Enable Stock Taking">
+    Check the **Stocktaking enabled** checkbox.
+    
+    This enables stock-taking for all assets in this warehouse.
+  </Step>
+  
+  <Step title="Configure Tag Suffix (Optional)">
+    Set **Stocktaking tag suffix** to differentiate tags by warehouse.
+    
+    Example: Set to "WH1" to create tags like `STOCK-WH1`
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **Save** to activate stock-taking for the warehouse.
+  </Step>
+</Steps>
+
+### Region Level
+
+<Steps>
+  <Step title="Navigate to Regions">
+    Go to **Settings → Regions** or visit `/accounts/region/`
+  </Step>
+  
+  <Step title="Edit Region">
+    Select the region where you want to enable stock-taking.
+  </Step>
+  
+  <Step title="Enable Stock Taking">
+    Check the **Stocktaking enabled** checkbox.
+    
+    This enables stock-taking for all users in this region.
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **Save** to activate stock-taking for the region.
+  </Step>
+</Steps>
+
+<Note>
+  An asset is eligible for stock-taking if **either** its warehouse or its user's region has stock-taking enabled.
+</Note>
+
+## Employee Stock-Taking Process
+
+Once enabled, employees see stock-taking options in their equipment view.
+
+### Accessing My Equipment
+
+<Steps>
+  <Step title="Navigate to My Equipment">
+    Employees click **My Equipment** from the user menu.
+  </Step>
+  
+  <Step title="Review Assigned Assets">
+    The page shows all assets assigned to the employee.
+  </Step>
+  
+  <Step title="Confirm or Report Missing">
+    For each asset, two options appear:
+    - **Yes, I have it** - Confirms possession
+    - **No, I don't have it** - Reports missing
+  </Step>
+</Steps>
+
+### Confirming Asset Possession
+
+When an employee confirms they have an asset:
+
+<Steps>
+  <Step title="Click Confirmation">
+    Employee clicks **Yes, I have it** for the asset.
+  </Step>
+  
+  <Step title="Review Asset Details">
+    A confirmation page shows:
+    - Barcode/Inventory number
+    - Category
+    - Manufacturer
+    - Model
+    - Serial number
+  </Step>
+  
+  <Step title="Confirm">
+    Employee confirms the information is correct.
+  </Step>
+  
+  <Step title="Asset Tagged">
+    Ralph automatically adds inventory tags to the asset:
+    - Base tag: `INVENTORY` (or configured value)
+    - Warehouse suffix: `INVENTORY-WH1` (if configured)
+    - User tag: `INVENTORY-USER`
+    - Date tag: `INVENTORY-2024-03-15` (if enabled)
+  </Step>
+</Steps>
+
+### Reporting Missing Assets
+
+When an employee reports an asset as missing:
+
+<Steps>
+  <Step title="Click Missing Report">
+    Employee clicks **No, I don't have it** for the asset.
+  </Step>
+  
+  <Step title="Asset Tagged as Missing">
+    Ralph adds a "missing" tag to the asset.
+  </Step>
+  
+  <Step title="Contact Information">
+    Employee sees instructions to contact the asset management team.
+  </Step>
+</Steps>
+
+## Stock-Taking Tags
+
+Tags are automatically applied to track stock-taking status.
+
+### Default Tags
+
+**Base Tag**
+- Default: `INVENTORY`
+- Configured via: `INVENTORY_TAG` setting
+
+**User Tag**
+- Default: `INVENTORY-USER`
+- Configured via: `INVENTORY_TAG_USER` setting
+
+**Missing Tag**
+- Default: `INVENTORY-MISSING`
+- Configured via: `INVENTORY_TAG_MISSING` setting
+
+### Warehouse-Specific Tags
+
+When a warehouse has a stocktaking tag suffix:
+
+```
+Base tag: INVENTORY
+Warehouse suffix: WH1
+Resulting tag: INVENTORY-WH1
+```
+
+This helps differentiate stock-taking campaigns across warehouses.
+
+### Date Tags
+
+If `INVENTORY_TAG_APPEND_DATE` is enabled:
+
+```
+Base tag: INVENTORY
+Date tag: INVENTORY-2024-03-15
+```
+
+Date tags help track when stock-taking occurred.
+
+## Configuration Settings
+
+Configure stock-taking behavior in Django settings:
+
+```python
+# Base inventory tag
+INVENTORY_TAG = 'STOCK'
+
+# User confirmation tag
+INVENTORY_TAG_USER = 'STOCK-USER'
+
+# Missing asset tag
+INVENTORY_TAG_MISSING = 'STOCK-MISSING'
+
+# Append date to tags
+INVENTORY_TAG_APPEND_DATE = True
+
+# URL for reporting missing assets
+MISSING_ASSET_REPORT_URL = 'https://helpdesk.example.com/report-missing'
+```
+
+## Asset History Tracking
+
+All stock-taking actions are recorded in asset history:
+
+- Timestamp of confirmation
+- User who performed the action
+- Tags added
+- Comments indicating stock-taking event
+
+This creates a complete audit trail.
+
+## Common Workflows
+
+### Annual Stock-Taking Campaign
+
+<Steps>
+  <Step title="Enable Stock-Taking">
+    Enable stock-taking on relevant warehouses or regions.
+  </Step>
+  
+  <Step title="Notify Employees">
+    Send email notification asking employees to verify their equipment.
+  </Step>
+  
+  <Step title="Monitor Progress">
+    Track completion by filtering assets with inventory tags.
+  </Step>
+  
+  <Step title="Follow Up on Missing">
+    Contact employees who reported missing assets.
+  </Step>
+  
+  <Step title="Generate Report">
+    Export list of verified and missing assets.
+  </Step>
+  
+  <Step title="Disable Stock-Taking">
+    Uncheck the enabled boxes when campaign is complete.
+  </Step>
+</Steps>
+
+### New Employee Onboarding
+
+<Steps>
+  <Step title="Assign Equipment">
+    Assign assets to new employee in Ralph.
+  </Step>
+  
+  <Step title="Employee Verifies">
+    New employee logs in and confirms receipt via My Equipment.
+  </Step>
+  
+  <Step title="Assets Tagged">
+    Automatic tagging confirms handover is complete.
+  </Step>
+</Steps>
+
+### Department Reorganization
+
+<Steps>
+  <Step title="Enable Regional Stock-Taking">
+    Enable for the affected region.
+  </Step>
+  
+  <Step title="Employees Verify">
+    All employees in region confirm their equipment.
+  </Step>
+  
+  <Step title="Identify Discrepancies">
+    Find assets that are assigned but not confirmed.
+  </Step>
+  
+  <Step title="Correct Records">
+    Update asset assignments based on actual possession.
+  </Step>
+</Steps>
+
+## Reporting and Analysis
+
+### Finding Verified Assets
+
+Filter assets by inventory tags:
+
+```bash
+# API: Assets verified in stock-taking
+curl "https://<YOUR-RALPH-URL>/api/back-office-assets/?tags__name=INVENTORY" \
+  -H "Authorization: Token YOUR_TOKEN"
+```
+
+### Finding Missing Assets
+
+```bash
+# API: Assets reported as missing
+curl "https://<YOUR-RALPH-URL>/api/back-office-assets/?tags__name=INVENTORY-MISSING" \
+  -H "Authorization: Token YOUR_TOKEN"
+```
+
+### Stock-Taking Completion Rate
+
+1. Count total assets assigned to users
+2. Count assets with inventory tags
+3. Calculate percentage: (tagged / total) × 100
+
+## Tips and Best Practices
+
+<Tip>
+  **Clear Communication**: Send clear instructions to employees before starting stock-taking.
+</Tip>
+
+<Tip>
+  **Set Deadlines**: Give employees a specific timeframe to complete verification.
+</Tip>
+
+<Tip>
+  **Use Date Tags**: Enable date tags to track multiple stock-taking campaigns over time.
+</Tip>
+
+<Tip>
+  **Warehouse Suffixes**: Use different suffixes for different locations to track regional campaigns.
+</Tip>
+
+<Warning>
+  Stock-taking tags are added automatically. Don't manually add inventory tags as they'll be overwritten during the next campaign.
+</Warning>
+
+## Integration with Regular Stock-Taking
+
+<Note>
+  Self-service stock-taking complements, but doesn't replace, traditional physical inventory counts.
+</Note>
+
+Use both methods:
+- **Self-service**: Quick verification for standard equipment
+- **Physical audit**: Detailed verification for high-value or sensitive items
+
+The tagging system works for both approaches.
+
+## Troubleshooting
+
+<Accordion title="Stock-taking option not visible">
+  - Verify stock-taking is enabled on warehouse or region
+  - Check that asset is assigned to a user
+  - Confirm user is logged in and viewing My Equipment page
+  - Verify user has permission to access My Equipment
+</Accordion>
+
+<Accordion title="Tags not being applied">
+  - Check INVENTORY_TAG settings are configured
+  - Verify user has permission to modify assets
+  - Review asset history for error messages
+  - Check that tags don't already exist
+</Accordion>
+
+<Accordion title="Can't disable stock-taking">
+  - Uncheck the "Stocktaking enabled" box on warehouse/region
+  - Save the changes
+  - Already-applied tags remain for audit purposes
+  - New confirmations won't be accepted
+</Accordion>
+
+## Related Documentation
+
+- [Custom Fields](/user-guide/custom-fields) - Add custom inventory data
+- [Dashboards](/user-guide/dashboards) - Visualize stock-taking progress

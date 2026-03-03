@@ -1,0 +1,320 @@
+---
+title: Domain Management
+description: Manage domain ownership, contracts, and costs in Ralph
+---
+
+Ralph's Domain module handles domain ownership, business purpose, and payment information. This is a domain ownership and contract management tool, not a DNS record manager.
+
+<Note>
+  For DNS record management, see [django-powerdns-dnssec](https://github.com/allegro/django-powerdns-dnssec) which integrates with PowerDNS server.
+</Note>
+
+## Overview
+
+The Domain module helps you:
+
+- Track domain ownership and registration details
+- Manage domain contracts and renewals
+- Monitor domain costs and billing
+- Organize domains by business segment
+- Link domains to services and environments
+- Maintain domain hierarchy (domain and subdomains)
+
+## Domain Structure
+
+Domains can be organized hierarchically:
+
+```
+allegrogroup.com (parent: none)
+├── test.allegrogroup.com (parent: allegrogroup.com)
+└── api.allegrogroup.com (parent: allegrogroup.com)
+```
+
+## Adding a Domain
+
+<Steps>
+  <Step title="Navigate to Domains">
+    Click **Domain → Domains → Add domain**
+  </Step>
+  
+  <Step title="Enter Domain Name">
+    Type the full domain name (e.g., `allegrogroup.com`).
+    
+    For top-level domains, leave **Parent** unset.
+  </Step>
+  
+  <Step title="Set Service Environment">
+    Select the **Service/Environment** pair describing why this domain exists.
+    
+    Examples:
+    - Service: "Auction Service", Environment: "production"
+    - Service: "Internal Tools", Environment: "testing"
+  </Step>
+  
+  <Step title="Choose Domain Status">
+    Select the current status:
+    - **Active** - Domain is in use
+    - **Pending lapse** - Expiring soon
+    - **Pending transfer** - Being transferred away
+    - **Lapsed** - Inactive/expired
+    - **Transferred away** - No longer owned
+  </Step>
+  
+  <Step title="Set Business Segment">
+    Choose or create a business segment to group related domains.
+    
+    Example: "Marketplaces", "Internal Services", "Partner Sites"
+  </Step>
+  
+  <Step title="Assign Ownership">
+    Set the responsible parties:
+    - **Business Owner** - Manages domain and subdomain strategy
+    - **Technical Owner** - Handles technical maintenance
+    - **Domain Holder** - Company receiving billing
+  </Step>
+  
+  <Step title="Add Pricing Information">
+    Enter contract details:
+    - **Expiration date** - When the domain registration expires
+    - **Registrant name** - Registrar (e.g., "GoDaddy", "Namecheap")
+    - **Domain price** - Cost for the registration period
+  </Step>
+  
+  <Step title="Save the Domain">
+    Click **Save** to create the domain record.
+  </Step>
+</Steps>
+
+## Adding Subdomains
+
+To add a subdomain:
+
+<Steps>
+  <Step title="Create Subdomain">
+    Add a new domain with the full subdomain name.
+    
+    Example: `test.allegrogroup.com`
+  </Step>
+  
+  <Step title="Set Parent">
+    In the **Parent** field, select the parent domain.
+    
+    Example: Select `allegrogroup.com`
+  </Step>
+  
+  <Step title="Configure Settings">
+    Set service environment, owners, and other details as needed.
+  </Step>
+</Steps>
+
+This creates a hierarchical relationship between domains.
+
+## Domain Fields Explained
+
+### Basic Information
+
+**Domain Name**
+- Full domain name including TLD
+- Must be unique across all domains
+- Example: `example.com`, `api.example.com`
+
+**Parent Domain**
+- Links subdomain to parent domain
+- Leave empty for top-level domains
+- Creates organizational hierarchy
+
+**Domain Status**
+- Tracks lifecycle state
+- Helps identify expiring or transferred domains
+- Use for renewal planning
+
+### Business Details
+
+**Service Environment**
+- Links domain to a specific service and deployment environment
+- Helps understand domain purpose
+- Useful for organizing multi-service architectures
+
+**Business Segment**
+- Groups domains by business unit or product line
+- Examples: "E-commerce", "Marketing", "Internal IT"
+- Enables cost allocation by segment
+
+### Ownership and Responsibility
+
+**Business Owner**
+- Responsible for domain strategy
+- Approves subdomain creation
+- Makes business decisions about domain use
+
+**Technical Owner**
+- Handles DNS configuration (if applicable)
+- Manages technical integrations
+- Responsible for uptime and technical SLAs
+
+**Domain Holder**
+- Legal entity that owns the domain
+- Receives invoices for domain registration
+- Example: "Allegro Group", "ACME Corporation"
+
+### Financial Information
+
+**Expiration Date**
+- When current registration expires
+- Used for renewal tracking
+- Set alerts before expiration
+
+**Registrant Name**
+- Domain registrar managing the domain
+- Examples: "GoDaddy", "Namecheap", "AWS Route53"
+- Helps track where domains are registered
+
+**Domain Price**
+- Cost for current registration period
+- Used for budget tracking
+- May include multiple years
+
+## Domain Status Types
+
+**Active**
+- Domain is currently in use
+- DNS is configured and serving traffic
+
+**Pending Lapse**
+- Approaching expiration date
+- Needs renewal decision
+- May require budget approval
+
+**Pending Transfer**
+- Being transferred to another registrar or owner
+- May have transfer lock period
+
+**Lapsed (Inactive)**
+- Registration has expired
+- May be in grace or redemption period
+- Could still be recoverable
+
+**Transferred Away**
+- No longer owned by your organization
+- Historical record only
+- Keep for audit trail
+
+## Common Workflows
+
+### Domain Renewal Planning
+
+<Steps>
+  <Step title="Find Expiring Domains">
+    Filter domains by expiration date to find those expiring soon.
+  </Step>
+  
+  <Step title="Contact Business Owner">
+    Verify if the domain should be renewed with the business owner.
+  </Step>
+  
+  <Step title="Update Status">
+    Set status to "Pending lapse" if renewal is uncertain.
+  </Step>
+  
+  <Step title="Process Renewal">
+    After renewal, update expiration date and price if changed.
+  </Step>
+</Steps>
+
+### Subdomain Request
+
+<Steps>
+  <Step title="Verify Parent Domain">
+    Ensure the parent domain exists in Ralph.
+  </Step>
+  
+  <Step title="Get Approval">
+    Contact the parent domain's business owner for approval.
+  </Step>
+  
+  <Step title="Create Subdomain">
+    Add the subdomain with parent relationship.
+  </Step>
+  
+  <Step title="Configure DNS">
+    If using PowerDNS integration, configure DNS records.
+  </Step>
+</Steps>
+
+### Cost Tracking
+
+<Steps>
+  <Step title="Group by Segment">
+    Use business segment to organize domains by cost center.
+  </Step>
+  
+  <Step title="Export Data">
+    Generate reports showing costs per segment.
+  </Step>
+  
+  <Step title="Budget Planning">
+    Use expiration dates to plan renewal costs for next fiscal year.
+  </Step>
+</Steps>
+
+## Integration with DNS Management
+
+While Ralph tracks domain ownership, DNS record management requires additional tools:
+
+### PowerDNS Integration
+
+For DNS records, use [django-powerdns-dnssec](https://github.com/allegro/django-powerdns-dnssec):
+
+- Manage A, AAAA, CNAME, MX records
+- DNSSEC support
+- Integration with PowerDNS server
+- API access to DNS records
+
+Ralph's domain module and PowerDNS can work together:
+- Ralph: Domain ownership and contracts
+- PowerDNS: DNS records and resolution
+
+## Tips and Best Practices
+
+<Tip>
+  **Set Expiration Reminders**: Create a process to review domains 60-90 days before expiration.
+</Tip>
+
+<Tip>
+  **Consistent Naming**: Use a standard for subdomain names (e.g., `service-environment.domain.com`).
+</Tip>
+
+<Tip>
+  **Document Ownership**: Always assign business and technical owners for accountability.
+</Tip>
+
+<Tip>
+  **Track All Costs**: Include multi-year registrations with the total cost and expiration date.
+</Tip>
+
+<Warning>
+  Domain expiration can cause service outages. Always monitor expiration dates and renew critical domains early.
+</Warning>
+
+## API Access
+
+Access domain data via REST API:
+
+```bash
+# List all domains
+curl https://<YOUR-RALPH-URL>/api/domains/ \
+  -H "Authorization: Token YOUR_TOKEN"
+
+# Get specific domain
+curl https://<YOUR-RALPH-URL>/api/domains/1234/ \
+  -H "Authorization: Token YOUR_TOKEN"
+
+# Filter by business segment
+curl https://<YOUR-RALPH-URL>/api/domains/?business_segment=5 \
+  -H "Authorization: Token YOUR_TOKEN"
+```
+
+## Related Documentation
+
+- [Custom Fields](/user-guide/custom-fields) - Add custom domain metadata
+- External: [django-powerdns-dnssec](https://github.com/allegro/django-powerdns-dnssec) for DNS management

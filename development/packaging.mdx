@@ -1,0 +1,371 @@
+---
+title: Packaging
+description: Learn how Ralph is packaged for distribution, including Debian packages, Docker images, and Python packaging with setup.py.
+---
+
+Ralph provides multiple packaging formats to support different deployment scenarios: Debian packages for Ubuntu, Docker images, and Python packages via setup.py.
+
+## Python Package (setup.py)
+
+### Package Configuration
+
+Ralph uses setuptools for Python packaging. The main configuration is in `setup.py:1`:
+
+```python
+from setuptools import find_packages, setup
+
+setup(
+    name="ralph",
+    version=get_version(),
+    author="Allegro.pl Sp. z o.o. and Contributors",
+    author_email="opensource@allegro.pl",
+    description="Advanced Asset Management and DCIM system for data center and back office.",
+    url="http://ralph.allegrogroup.com/",
+    packages=find_packages("src"),
+    package_dir={"": "src"},
+    zip_safe=False,  # Templates are loaded from file path
+    entry_points={
+        "console_scripts": [
+            "ralph = ralph.__main__:prod",
+            "dev_ralph = ralph.__main__:dev",
+            "test_ralph = ralph.__main__:test",
+            "validate_ralph = ralph.cross_validator.__main__:main",
+        ],
+    },
+)
+```
+
+### Requirements
+
+Ralph requires Python 3.10 or higher (`setup.py:9`):
+
+```python
+assert sys.version_info >= (3, 10), "Python 3.10+ required."
+```
+
+### Entry Points
+
+Ralph provides multiple console scripts and extension points:
+
+**Console Scripts:**
+- `ralph` - Production server
+- `dev_ralph` - Development server with additional features
+- `test_ralph` - Test runner
+- `validate_ralph` - Cross-validation tool
+
+**Extension Points:**
+- `back_office.transition_action.email_context` - Email context for transitions
+- `account.views.get_asset_list_class` - Custom asset list views
+- `ralph.cloud_sync_processors` - Cloud synchronization processors
+
+See `setup.py:37` for all entry points.
+
+### Version Generation
+
+Ralph uses a shell script to generate versions based on git tags:
+
+```bash
+#!/bin/bash
+LATEST_TAG=$(git describe --abbrev=0)
+CURRENT_TAG=$(git describe)
+
+generate_next_version() {
+    current_dateversion=$(echo "${LATEST_TAG}" | cut -d '.' -f1)
+    new_dateversion=$(date +"%Y%m%d")
+    # ...
+}
+```
+
+The version format is `YYYYMMDD.PATCH` (e.g., `20240315.1`).
+
+## Debian Packages
+
+Ralph provides official Debian packages for Ubuntu using `dh_virtualenv`, which packages the application and all dependencies into a self-contained virtualenv.
+
+### Why dh_virtualenv?
+
+Ralph's dependency requirements make traditional Debian packaging challenging. Using `dh_virtualenv` provides a compromise between package availability and maintenance effort by:
+
+- Installing all dependencies into a virtualenv
+- Packaging the entire virtualenv as a `.deb` file
+- Avoiding conflicts with system Python packages
+- Simplifying dependency management
+
+### Package Details
+
+**Package Name**: `ralph-core`
+
+**Build Dependencies** (`debian/control:5`):
+- `debhelper (>= 9)`
+- `dh-virtualenv`
+- `git`
+- `libmysqlclient-dev`
+- `python3 (>=3.10)`
+- `libffi-dev`
+- `nodejs (>= 22.0.0)`
+- `npm`
+
+**Runtime Dependencies** (`debian/control:10`):
+- `python3 (>=3.10)`
+- `libmysqlclient21`
+- `python3-distutils`
+- `debconf`
+
+**Suggested Packages**:
+- `mysql-server`
+- `redis`
+
+### Building Packages
+
+Ralph supports two build modes: snapshot (testing) and release (production).
+
+#### Building Snapshot Packages
+
+Snapshot packages can be built from any commit for testing purposes:
+
+```bash
+make build-snapshot-package
+```
+
+The built package will be placed in the `build/` directory with a name like:
+```
+ralph-core_<DATE>.<PATCH>-<BRANCH>-SNAPSHOT_amd64.deb
+```
+
+This target:
+1. Builds a Docker container with build dependencies
+2. Generates a snapshot changelog
+3. Builds the package
+4. Copies it to `build/`
+5. Cleans up the container
+
+See `Makefile:33` for implementation.
+
+#### Building Release Packages
+
+Release packages should be built from tagged commits on the `ng` branch:
+
+```bash
+make build-package
+```
+
+See `Makefile:28` for implementation.
+
+<Warning>
+Release packages are meant for production use. Always build from tagged commits on the `ng` branch.
+</Warning>
+
+### Publishing Packages
+
+Packages are published to [packagecloud.io/allegro/ralph](https://packagecloud.io/allegro/ralph) by Ralph maintainers. Publishing is triggered automatically when a new GitHub release is created.
+
+## Docker Images
+
+Ralph provides multiple Docker images for different purposes.
+
+### Available Images
+
+**ralph**: Main application image
+```bash
+make build-docker-image
+```
+
+Builds:
+- `allegro/ralph:latest`
+- `allegro/ralph:<VERSION>`
+
+**ralph-static-nginx**: Static files with nginx
+- `allegro/ralph-static-nginx:latest`
+- `allegro/ralph-static-nginx:<VERSION>`
+
+**inkpy**: Additional utility image
+- `allegro/inkpy:<VERSION>`
+
+See `Makefile:40` for build configuration.
+
+### Building Snapshot Docker Images
+
+Build snapshot images for testing:
+
+```bash
+make build-snapshot-docker-image
+```
+
+This will:
+1. Build a snapshot Debian package
+2. Build Docker images using the snapshot package
+3. Tag images with snapshot version
+
+See `Makefile:57` for implementation.
+
+### Publishing Docker Images
+
+```bash
+# Publish release images
+make publish-docker-image
+
+# Publish snapshot images
+make publish-docker-snapshot-image
+```
+
+See `Makefile:73` and `Makefile:80` for publishing targets.
+
+### Customizing Docker Repository
+
+Set the `DOCKER_REPO_NAME` variable to push to a different repository:
+
+```bash
+make build-docker-image DOCKER_REPO_NAME=mycompany
+```
+
+## Package Ecosystem Design
+
+Ralph's packaging system is designed to be environment-agnostic:
+
+### Key Principles
+
+1. **No specific environment required**: All operations can be performed using tools a regular Ralph developer already has
+
+2. **Docker-based builds**: Everything runs in Docker containers to avoid platform dependencies
+
+3. **Container rebuilds**: Containers are rebuilt for each operation to avoid IO performance issues with mounted volumes on certain platforms
+
+4. **Official repository**: Packages are published to packagecloud.io, owned by Allegro
+
+5. **GitHub integration**: Package publishing is triggered by creating GitHub releases
+
+### Why Docker for Building?
+
+Using Docker for package building provides several benefits:
+
+- **Platform independence**: Developers on macOS, Windows, or Linux can build packages
+- **Consistent environment**: Same build environment for all maintainers
+- **No system pollution**: Build dependencies don't affect the host system
+- **Reproducible builds**: Same Dockerfile produces same packages
+
+## Makefile Targets
+
+### Package Management
+
+```bash
+# Build snapshot package for testing
+make build-snapshot-package
+
+# Build release package for production
+make build-package
+
+# Release a new version (maintainers only)
+make release-new-version
+```
+
+### Docker Images
+
+```bash
+# Build Docker images
+make build-docker-image
+make build-snapshot-docker-image
+
+# Publish Docker images
+make publish-docker-image
+make publish-docker-snapshot-image
+```
+
+### Development
+
+```bash
+# Install dependencies
+make install          # Production dependencies
+make install-dev      # Development dependencies
+make install-test     # Test dependencies
+make install-docs     # Documentation dependencies
+
+# Install JavaScript dependencies
+make install-js
+
+# Run the development server
+make run
+
+# Run tests
+make test TEST=ralph.assets
+make coverage
+
+# Code quality
+make flake           # Flake8 linting
+make checks          # Ruff checks
+make isort           # Import sorting
+
+# Build documentation
+make docs
+```
+
+See `Makefile:1` for all available targets.
+
+## Installation from Packages
+
+### Installing Debian Package
+
+```bash
+# Add packagecloud repository
+curl -s https://packagecloud.io/install/repositories/allegro/ralph/script.deb.sh | sudo bash
+
+# Install ralph-core
+sudo apt-get install ralph-core
+```
+
+### Installing from PyPI
+
+```bash
+pip install ralph-ng
+```
+
+### Installing from Source
+
+```bash
+git clone https://github.com/allegro/ralph.git
+cd ralph
+make install
+```
+
+## Best Practices
+
+1. **Use snapshot packages for testing**: Never deploy snapshot packages to production
+
+2. **Verify package contents**: After building, inspect the package to ensure all files are included
+
+3. **Test in containers**: Use Docker to test packages in clean environments
+
+4. **Follow semantic versioning**: Version numbers should reflect the release date and patch level
+
+5. **Document build dependencies**: Keep `debian/control` and setup.py requirements in sync
+
+6. **Clean builds**: Always use `--force-rm` with Docker builds to avoid stale layers
+
+## Troubleshooting
+
+### Build Fails with Missing Dependencies
+
+Ensure all build dependencies are listed in `debian/control`. Check the build log for specific missing packages.
+
+### Version Mismatch
+
+The version is generated from git tags. Ensure you have the latest tags:
+```bash
+git fetch --tags
+```
+
+### Docker Build Timeout
+
+Increase Docker's memory and CPU allocation in Docker Desktop settings.
+
+### Package Installation Fails
+
+Check that all runtime dependencies are installed:
+```bash
+sudo apt-get install -f
+```
+
+## Related Documentation
+
+- [Maintainer Tools](/development/maintainer-tools) - Tools for Ralph maintainers
+- [Development Environment](/development/setup) - Setting up your development environment
+

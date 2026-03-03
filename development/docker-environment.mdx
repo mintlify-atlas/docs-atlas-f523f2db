@@ -1,0 +1,378 @@
+---
+title: "Docker Development Environment"
+description: "Set up Ralph for development using Docker containers for a consistent, isolated environment"
+---
+
+This guide covers setting up Ralph using Docker containers. This approach provides a consistent development environment across different platforms and requires minimal local dependencies.
+
+## Prerequisites
+
+Only Docker is required:
+
+- **Docker** 24.0.0 or later
+- **docker-compose** (usually bundled with Docker Desktop)
+
+<Note>
+  On Apple Silicon (M1/M2/M3) Macs, you'll need to enable x86/amd64 emulation in Docker settings.
+</Note>
+
+## Quick Start
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/allegro/ralph.git
+    cd ralph
+    ```
+  </Step>
+
+  <Step title="Start the containers">
+    Launch all services using docker-compose:
+    
+    ```bash
+    docker-compose -f docker/docker-compose-local-dev.yml up
+    ```
+    
+    This builds and starts:
+    - **web** - Ralph application (port 8000)
+    - **db** - MySQL 5.7 database
+    - **redis** - Redis cache server
+    - **inkpy** - Background job processor
+    - **nginx** - Static file server (port 80)
+  </Step>
+
+  <Step title="Initialize the database (first run only)">
+    On first launch or after removing the database volume, initialize Ralph:
+    
+    ```bash
+    docker exec docker-web-1 /opt/local/init-local-dev-ralph.sh
+    ```
+    
+    <Warning>
+      This command may take several minutes to complete on first run.
+    </Warning>
+    
+    This script performs:
+    - Database migrations (`ralph migrate --noinput`)
+    - Menu synchronization (`ralph sitetree_resync_apps`)
+    - Superuser creation (username: `ralph`, password: `ralph`)
+  </Step>
+</Steps>
+
+## Access Ralph
+
+Once all services are running, access Ralph at:
+
+```
+http://localhost:80
+```
+
+**Default credentials:**
+- Username: `ralph`
+- Password: `ralph`
+
+## Docker Architecture
+
+### Service Overview
+
+The `docker/docker-compose-local-dev.yml` defines these services:
+
+```yaml docker/docker-compose-local-dev.yml
+services:
+  web:
+    platform: linux/amd64
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile-local-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../.:/var/local/ralph
+    environment:
+      DATABASE_NAME: ralph_ng
+      DATABASE_USER: ralph_ng
+      DATABASE_PASSWORD: ralph_ng
+      DATABASE_HOST: db
+      REDIS_HOST: redis
+```
+
+### Volume Mounts
+
+The web container mounts your local source directory:
+
+```
+../.:/var/local/ralph
+```
+
+This means:
+- Code changes are immediately reflected in the container
+- You can edit files on your host machine
+- No container rebuild needed for code changes
+
+### Database Persistence
+
+Database data is stored in a Docker volume:
+
+```yaml
+volumes:
+  ralph_dbdata:
+```
+
+To reset the database:
+```bash
+docker-compose -f docker/docker-compose-local-dev.yml down -v
+docker-compose -f docker/docker-compose-local-dev.yml up
+# Re-initialize after restart
+docker exec docker-web-1 /opt/local/init-local-dev-ralph.sh
+```
+
+## Development Workflow
+
+### Rebuilding Static Assets
+
+When you modify JavaScript, CSS, or install new npm packages:
+
+```bash
+docker exec docker-web-1 /opt/local/rebuild-local-dev-statics.sh
+```
+
+This script:
+1. Runs `npm install` to update dependencies
+2. Executes `gulp` to rebuild static files
+
+<Warning>
+  **Known Issue:** Static file building may fail or hang on Apple Silicon using Rosetta emulation. If this occurs, try rebuilding the container or running static builds on the host machine instead.
+</Warning>
+
+### Viewing Logs
+
+Monitor all services:
+```bash
+docker-compose -f docker/docker-compose-local-dev.yml logs -f
+```
+
+View specific service logs:
+```bash
+docker-compose -f docker/docker-compose-local-dev.yml logs -f web
+```
+
+### Running Django Management Commands
+
+Execute Django commands inside the web container:
+
+```bash
+# Create migrations
+docker exec docker-web-1 ralph makemigrations
+
+# Run migrations
+docker exec docker-web-1 ralph migrate
+
+# Create superuser
+docker exec docker-web-1 ralph createsuperuser
+
+# Django shell
+docker exec -it docker-web-1 ralph shell
+```
+
+### Running Tests
+
+Execute the test suite:
+```bash
+docker exec docker-web-1 test_ralph test
+```
+
+Run specific tests:
+```bash
+docker exec docker-web-1 test_ralph test ralph.assets.tests
+```
+
+### Accessing the Container Shell
+
+Open a bash session in the web container:
+```bash
+docker exec -it docker-web-1 bash
+```
+
+## PyCharm IDE Integration
+
+Ralph supports remote Python interpreter configuration in PyCharm Professional.
+
+<Steps>
+  <Step title="Add Docker interpreter">
+    1. Go to **Settings → Project: ralph → Python Interpreter**
+    2. Click **Add Interpreter → On Docker**
+    3. Select `docker/Dockerfile-local-interpreter` as the Dockerfile
+    4. Change context folder to `.` (project root)
+  </Step>
+
+  <Step title="Configure platform (Apple Silicon only)">
+    If using Apple Silicon architecture:
+    
+    Under **Options → Build options**, add:
+    ```
+    --platform linux/amd64
+    ```
+    
+    <Note>
+      This requires amd64 emulation enabled in Docker Desktop.
+    </Note>
+  </Step>
+
+  <Step title="Verify interpreter">
+    After clicking Next:
+    - Verify the interpreter path is correct
+    - Confirm all Ralph dependencies are detected
+  </Step>
+</Steps>
+
+## Container Build Details
+
+The development Dockerfile (`docker/Dockerfile-local-dev`) is based on Ubuntu Jammy and includes:
+
+### System Packages
+```dockerfile
+# Python 3.10 with development headers
+python3.10-dev python3-pip python3-setuptools
+
+# LDAP support
+libldap2-dev libsasl2-dev
+
+# Database clients
+libmysqlclient21 libmysqlclient-dev
+
+# Node.js 22.x for frontend builds
+nodejs
+```
+
+### Entry Point Script
+
+The container runs `/opt/local/docker-local-dev-entrypoint.sh`:
+
+```bash docker/provision/docker-local-dev-entrypoint.sh
+#!/bin/bash
+set -e
+pip3 install -r /var/local/ralph/requirements/dev.txt
+cd /var/local/ralph
+if [[ ! -d src/ralph/static/vendor || ! -d src/ralph/static/css ]]; then
+  /opt/local/rebuild-local-dev-statics.sh
+else
+  echo "Statics found. Not attempting to recreate them"
+fi
+make run
+```
+
+This automatically:
+1. Installs Python dependencies
+2. Builds static files if missing
+3. Starts the development server
+
+## Environment Variables
+
+Customize container behavior with environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_NAME` | `ralph_ng` | Database name |
+| `DATABASE_USER` | `ralph_ng` | Database username |
+| `DATABASE_PASSWORD` | `ralph_ng` | Database password |
+| `DATABASE_HOST` | `db` | Database host (service name) |
+| `REDIS_HOST` | `redis` | Redis host (service name) |
+| `REDIS_PORT` | `6379` | Redis port |
+| `REDIS_DB` | `0` | Redis database number |
+
+## Useful Commands
+
+### Container Management
+
+```bash
+# Start in background
+docker-compose -f docker/docker-compose-local-dev.yml up -d
+
+# Stop services
+docker-compose -f docker/docker-compose-local-dev.yml down
+
+# Restart specific service
+docker-compose -f docker/docker-compose-local-dev.yml restart web
+
+# Rebuild containers
+docker-compose -f docker/docker-compose-local-dev.yml build --no-cache
+```
+
+### Database Operations
+
+```bash
+# Access MySQL shell
+docker exec -it docker-db-1 mysql -u ralph_ng -pralph_ng ralph_ng
+
+# Dump database
+docker exec docker-db-1 mysqldump -u ralph_ng -pralph_ng ralph_ng > backup.sql
+
+# Restore database
+docker exec -i docker-db-1 mysql -u ralph_ng -pralph_ng ralph_ng < backup.sql
+```
+
+## Troubleshooting
+
+### Port Already in Use
+
+If port 80 or 8000 is already bound:
+
+```yaml
+ports:
+  - "8080:8000"  # Change host port to 8080
+```
+
+### Container Won't Start
+
+Check logs for errors:
+```bash
+docker-compose -f docker/docker-compose-local-dev.yml logs web
+```
+
+Common issues:
+- Platform mismatch (use `--platform linux/amd64` on ARM)
+- Out of disk space
+- Port conflicts
+
+### Static Files Not Building
+
+On Apple Silicon, Node.js builds may hang. Try:
+
+1. Build static files on host:
+   ```bash
+   npm install
+   ./node_modules/.bin/gulp
+   ```
+
+2. Or disable Rosetta emulation in Docker settings
+
+### Database Connection Failed
+
+Ensure the database container is healthy:
+```bash
+docker-compose -f docker/docker-compose-local-dev.yml ps db
+```
+
+Wait for MySQL to fully initialize (may take 30-60 seconds on first run).
+
+## Comparison with Local Setup
+
+| Aspect | Docker | Local |
+|--------|--------|-------|
+| **Setup Time** | Fast | Moderate |
+| **System Dependencies** | Minimal | Many |
+| **IDE Integration** | Limited | Full |
+| **Performance** | Good (slower on Mac) | Excellent |
+| **Debugging** | More complex | Direct |
+| **Consistency** | Identical across systems | Varies |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Local Setup" icon="laptop-code" href="/development/setup">
+    Switch to local development setup
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/development/architecture">
+    Learn about Ralph's architecture
+  </Card>
+</CardGroup>

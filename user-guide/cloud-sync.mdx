@@ -1,0 +1,338 @@
+---
+title: Cloud Synchronization
+description: Keep cloud assets synchronized with cloud providers like OpenStack and AWS
+---
+
+Ralph's cloud synchronization feature maintains near real-time synchronization between your cloud infrastructure and Ralph's asset database.
+
+## Overview
+
+Cloud synchronization enables:
+
+- **Automatic asset updates** - Keep cloud hosts, flavors, and images in sync
+- **Event-driven sync** - Near real-time updates via cloud event streams
+- **Multiple providers** - Support for OpenStack, AWS, and custom providers
+- **HTTP endpoint** - Generic integration point for any cloud platform
+
+## How Cloud Sync Works
+
+Ralph provides an HTTP endpoint that consumes messages from cloud platforms. When events occur in the cloud (VM created, deleted, resized), the cloud provider sends notifications to Ralph, which automatically updates the corresponding assets.
+
+### Sync Architecture
+
+```
+Cloud Provider → Event Stream → Adapter → Ralph HTTP Endpoint → Database
+```
+
+While some providers may require an adapter to connect their event stream to Ralph's endpoint, this approach is the most generic way to achieve close-to-real-time synchronization.
+
+## Configuring Cloud Providers
+
+<Steps>
+  <Step title="Identify Provider Boundaries">
+    Determine which cloud providers contain isolated sets of assets and provide isolated event streams.
+    
+    Each isolated environment needs its own Cloud Provider configuration.
+  </Step>
+  
+  <Step title="Navigate to Cloud Providers">
+    Click **Cloud → Cloud providers** from the main menu.
+  </Step>
+  
+  <Step title="Add Cloud Provider">
+    Click **Add cloud provider** to create a new configuration.
+  </Step>
+  
+  <Step title="Configure Settings">
+    Fill in the cloud provider details (see configuration options below).
+  </Step>
+  
+  <Step title="Save and Test">
+    Save the configuration and test synchronization.
+  </Step>
+</Steps>
+
+## Configuration Options
+
+### Basic Settings
+
+**Name**
+- Descriptive name for the cloud provider
+- Example: "Production OpenStack", "AWS US-East-1"
+
+**Cloud Sync Enabled**
+- Check to enable synchronization
+- When enabled, Ralph generates an HTTP endpoint for receiving events
+- Uncheck to temporarily disable sync without deleting configuration
+
+### Synchronization Driver
+
+**Cloud Sync Driver**
+- Specifies which driver Ralph uses to process cloud events
+- Required when synchronization is enabled
+- Must match your cloud platform type
+
+### Client Configuration
+
+**Client Configuration**
+- JSON object containing credentials and connection details
+- Used by the sync driver to communicate with the cloud API
+- Format depends on the selected driver
+
+## Available Drivers
+
+Ralph provides these built-in drivers:
+
+### noop Driver
+
+A no-operation driver for testing:
+
+```json
+{}
+```
+
+- Receives events but doesn't process them
+- Useful for testing event delivery
+- No configuration required
+
+### OpenStack Ocata Driver
+
+Synchronizes with OpenStack Ocata:
+
+```json
+{
+  "version": "3.0",
+  "auth_url": "http://10.0.0.1:35357/v3/",
+  "username": "admin",
+  "password": "admin",
+  "tenant_name": "admin"
+}
+```
+
+**Configuration Fields:**
+- `version` - OpenStack API version (typically "3.0")
+- `auth_url` - Keystone authentication endpoint
+- `username` - OpenStack admin username
+- `password` - OpenStack admin password
+- `tenant_name` - Default tenant/project name
+
+## Setting Up OpenStack Sync
+
+<Steps>
+  <Step title="Configure Cloud Provider">
+    Create a cloud provider in Ralph with:
+    - Name: Your OpenStack cluster name
+    - Driver: `openstack.ocata`
+    - Client config: OpenStack credentials (see above)
+  </Step>
+  
+  <Step title="Note the Endpoint URL">
+    After saving, Ralph displays the HTTP endpoint URL.
+    
+    Format: `https://ralph.example.com/cloud-sync/provider/<id>/`
+  </Step>
+  
+  <Step title="Configure Event Notifications">
+    In OpenStack, configure event notifications to send to Ralph's endpoint.
+    
+    This typically involves:
+    - Enabling notifications in Nova, Neutron, etc.
+    - Configuring message queue routing
+    - Setting up a webhook or adapter
+  </Step>
+  
+  <Step title="Test Synchronization">
+    Create a test VM in OpenStack and verify it appears in Ralph:
+    - Go to **Cloud → Cloud hosts**
+    - Look for the new VM
+    - Check that details are correct
+  </Step>
+</Steps>
+
+## Synchronized Objects
+
+Cloud sync maintains these object types:
+
+### Cloud Hosts
+
+Virtual machine instances:
+- Hostname
+- IP addresses
+- Flavor (instance type)
+- Image
+- Status (running, stopped, etc.)
+- Hypervisor assignment
+
+### Cloud Flavors
+
+Instance types/sizes:
+- Name
+- CPU cores
+- Memory
+- Disk size
+- Resource quotas
+
+### Cloud Images
+
+OS images and templates:
+- Name
+- Image ID
+- Operating system
+- Architecture
+
+## Event Handling
+
+The sync system processes these event types:
+
+**Create Events**
+- New cloud hosts
+- New flavors
+- New images
+
+**Update Events**
+- Instance resize/flavor change
+- Status changes (start, stop, pause)
+- IP address changes
+- Hostname updates
+
+**Delete Events**
+- Instance termination
+- Image deletion
+- Flavor removal
+
+## API Access
+
+Access synchronized cloud assets via API:
+
+```bash
+# List cloud hosts
+curl https://<YOUR-RALPH-URL>/api/cloud-hosts/ \
+  -H "Authorization: Token YOUR_TOKEN"
+
+# Get specific cloud host
+curl https://<YOUR-RALPH-URL>/api/cloud-hosts/1234/ \
+  -H "Authorization: Token YOUR_TOKEN"
+
+# Filter by cloud provider
+curl https://<YOUR-RALPH-URL>/api/cloud-hosts/?cloud_provider=5 \
+  -H "Authorization: Token YOUR_TOKEN"
+```
+
+## Monitoring Synchronization
+
+### Check Sync Status
+
+1. Go to **Cloud → Cloud hosts**
+2. Verify recent VMs appear
+3. Check that details match cloud provider
+
+### Troubleshooting Sync Issues
+
+<Steps>
+  <Step title="Verify Endpoint Access">
+    Test that the cloud provider can reach Ralph's HTTP endpoint:
+    
+    ```bash
+    curl https://ralph.example.com/cloud-sync/provider/1/
+    ```
+  </Step>
+  
+  <Step title="Check Credentials">
+    Verify client configuration credentials are correct:
+    - Test OpenStack login manually
+    - Check API endpoint accessibility
+    - Verify permissions
+  </Step>
+  
+  <Step title="Review Logs">
+    Check Ralph logs for sync errors:
+    - Authentication failures
+    - Network timeouts
+    - Parsing errors
+  </Step>
+  
+  <Step title="Test Events">
+    Create a test VM and watch for sync:
+    - Create VM in cloud platform
+    - Wait for event delivery (usually seconds)
+    - Check if VM appears in Ralph
+  </Step>
+</Steps>
+
+## Security Considerations
+
+<Warning>
+  **Protect Credentials**: Client configuration contains sensitive credentials. Use strong passwords and restrict access to cloud provider settings.
+</Warning>
+
+<Tip>
+  **Use HTTPS**: Always use HTTPS for the Ralph instance to protect event data in transit.
+</Tip>
+
+<Tip>
+  **Network Security**: Restrict access to the cloud sync endpoint to only your cloud provider's IP ranges.
+</Tip>
+
+## Advanced Configuration
+
+### Custom Sync Drivers
+
+For unsupported cloud platforms, you can:
+
+1. Create a custom sync driver in Ralph
+2. Implement the event processing logic
+3. Register the driver
+4. Configure client connection details
+
+See Ralph's development documentation for driver implementation details.
+
+### Multiple Regions
+
+For multi-region cloud deployments:
+
+1. Create separate cloud provider for each region
+2. Use distinct names (e.g., "AWS US-East", "AWS EU-West")
+3. Configure each with region-specific credentials
+4. Events route to the correct Ralph provider
+
+## Tips and Best Practices
+
+<Tip>
+  **Start with Test**: Configure sync on a test/development cloud environment first to verify setup.
+</Tip>
+
+<Tip>
+  **Monitor Initially**: Watch sync closely after initial setup to catch configuration issues early.
+</Tip>
+
+<Tip>
+  **Document Mappings**: Keep documentation of how cloud resources map to Ralph assets.
+</Tip>
+
+## Troubleshooting
+
+<Accordion title="VMs not appearing in Ralph">
+  - Verify cloud sync is enabled on the provider
+  - Check that events are being sent from cloud platform
+  - Review Ralph logs for errors
+  - Test endpoint accessibility
+  - Verify credentials in client configuration
+</Accordion>
+
+<Accordion title="Authentication errors">
+  - Double-check username and password
+  - Verify auth_url is correct and accessible
+  - Ensure user has required permissions in OpenStack
+  - Check tenant_name is valid
+</Accordion>
+
+<Accordion title="Outdated information">
+  - Cloud sync is event-driven; manual changes in Ralph may be overwritten
+  - Check that all event types are configured in cloud platform
+  - Verify event delivery isn't delayed or failing
+</Accordion>
+
+## Related Documentation
+
+- [DCIM](/user-guide/dcim) - Physical infrastructure management
+- External: [OpenStack API Documentation](https://docs.openstack.org/api-quick-start/)

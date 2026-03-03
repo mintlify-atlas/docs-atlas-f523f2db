@@ -1,0 +1,383 @@
+---
+title: Support Contracts
+description: Manage vendor support contracts, warranties, and SLA agreements with comprehensive tracking and expiration monitoring
+---
+
+Ralph's Support Contracts module helps you track vendor support agreements, maintenance contracts, warranties, and SLAs for your IT infrastructure.
+
+## Overview
+
+The Supports module enables:
+
+- Vendor support contract tracking
+- SLA and warranty management
+- Asset-to-support relationship mapping
+- Expiration date monitoring
+- Support documentation and escalation paths
+- Financial tracking for support costs
+
+<CardGroup cols={2}>
+  <Card title="Contract Management" icon="file-contract">
+    Track support agreements with vendors including terms, costs, and coverage
+  </Card>
+  
+  <Card title="Asset Assignment" icon="link">
+    Link support contracts to specific hardware and infrastructure
+  </Card>
+  
+  <Card title="Expiration Alerts" icon="bell">
+    Monitor upcoming renewal dates and warranty expirations
+  </Card>
+  
+  <Card title="Escalation Paths" icon="phone">
+    Document support contact information and escalation procedures
+  </Card>
+</CardGroup>
+
+## Support Types
+
+Classify your support contracts:
+
+- **Warranty** - Manufacturer standard warranty
+- **Extended Warranty** - Purchased warranty extensions
+- **Maintenance Agreement** - Regular maintenance services
+- **Premium Support** - 24/7 support with guaranteed response times
+- **On-Site Support** - Vendor on-site service agreements
+- **Depot Repair** - Return-to-depot service contracts
+- **Software Support** - Application support and updates
+
+Create custom support types to match your organization's needs.
+
+## Creating Support Contracts
+
+### Required Information
+
+To add a new support contract:
+
+1. **Name** - Descriptive name for the contract
+2. **Contract ID** - Vendor's contract reference number
+3. **Date To** - Contract expiration date (required)
+4. **Asset Type** - Data Center, Back Office, or All
+
+### Optional Details
+
+**Contract Information**
+- **Date From** - Contract start date
+- **Support Type** - Category of support
+- **Status** - Contract status (new, active, expired)
+- **Description** - Summary of coverage
+- **Contract Terms** - Detailed terms and conditions
+
+**Vendor Information**
+- **Producer** - Equipment manufacturer
+- **Supplier** - Support service provider
+- **Serial Number** - Equipment serial covered
+
+**Service Details**
+- **SLA Type** - Service level agreement details
+- **Escalation Path** - Contact information and escalation steps
+
+**Financial Tracking**
+- **Price** - Annual or total contract cost
+- **Budget Info** - Cost center allocation
+- **Region** - Geographic coverage area
+
+<Note>
+The Contract ID is required and should match the vendor's reference number. This makes it easy to reference during support calls.
+</Note>
+
+## Asset Assignment
+
+### Assigning Supports to Assets
+
+Link support contracts to covered equipment:
+
+1. **From Support Record**
+   - Open support contract detail page
+   - Click "Assets" tab
+   - Add assets covered by this contract
+   
+2. **From Asset Record**
+   - Open asset detail page
+   - Click "Supports" tab  
+   - Add applicable support contracts
+
+<Tip>
+A single support contract can cover multiple assets, and a single asset can have multiple support contracts (e.g., hardware warranty + software support).
+</Tip>
+
+### Assignment Scenarios
+
+**Single Device Support**
+- Server with vendor warranty
+- Network equipment with maintenance
+- Storage array with premium support
+
+**Bulk Coverage**
+- Fleet-wide laptop warranties
+- Data center hardware under single contract
+- Site-wide equipment maintenance
+
+**Layered Support**
+- Base manufacturer warranty
+- Extended hardware support  
+- Software support contract
+- Premium SLA agreement
+
+## Support Status
+
+Track the lifecycle of support contracts:
+
+- **New** - Recently created, not yet active
+- **Active** - Current and in effect
+- **Expired** - Past the end date
+- **Renewed** - Contract has been renewed
+- **Cancelled** - Contract terminated early
+
+<Note>
+Support status is tracked separately from expiration dates. A contract might be "Active" even if approaching its end date, while "Expired" indicates it has passed the date_to.
+</Note>
+
+## Escalation Paths
+
+Document support contact procedures:
+
+```
+Level 1: support@vendor.com, +1-800-555-0100
+Level 2: premium-support@vendor.com, Account Manager John Smith
+Level 3: Critical escalation - Direct line +1-800-555-0911
+```
+
+Include:
+- Contact methods (email, phone, portal)
+- Hours of availability
+- Response time expectations
+- Account or customer numbers
+- Specific contact names
+
+<Tip>
+Keep escalation paths up-to-date. Verify contact information during each contract renewal.
+</Tip>
+
+## SLA Management
+
+### SLA Types
+
+Document service level agreements:
+
+- **4-Hour Response** - Critical issue response time
+- **Next Business Day** - Standard response SLA
+- **24/7 Support** - Round-the-clock availability
+- **99.9% Uptime** - Availability guarantees
+- **On-Site within 4 Hours** - Physical response time
+
+### SLA Tracking
+
+Use the SLA Type field to record:
+- Response time commitments
+- Resolution time targets
+- Availability guarantees
+- Coverage hours
+- Parts replacement terms
+
+## Contract Terms
+
+The Contract Terms field (text area) should include:
+
+- **Covered Services** - What's included in support
+- **Exclusions** - What's not covered
+- **Coverage Hours** - 24/7, business hours, etc.
+- **Response Times** - Guaranteed response SLAs
+- **Parts & Labor** - What's included
+- **Renewal Terms** - Auto-renewal or manual
+- **Cancellation** - Notice requirements
+- **Payment Terms** - Billing schedule
+
+<Tip>
+For complex contracts, attach the full agreement PDF using Ralph's attachments feature and use Contract Terms for a quick summary.
+</Tip>
+
+## Financial Management
+
+### Cost Tracking
+
+- **Price** - Total contract value
+- **Budget Info** - Link to budget and cost center
+- **Region** - For regional cost allocation
+- **Order Number** - Purchase order reference
+- **Invoice Number** - Billing reference
+
+### Reporting
+
+Generate financial reports:
+- Total support costs by vendor
+- Support costs by asset type
+- Upcoming renewal costs
+- Support cost per asset
+- Year-over-year trends
+
+## Expiration Management
+
+### Monitoring Renewals
+
+Stay ahead of expiring contracts:
+
+1. **Expiration Reports** - Generate reports of upcoming expirations
+2. **Filter by Date** - View contracts expiring in next 30/60/90 days
+3. **Set Reminders** - Create tasks for renewal processing
+4. **Vendor Contact** - Initiate renewal discussions
+
+<Tip>
+Create a recurring monthly report showing all supports expiring in the next 90 days. This gives adequate time to budget and negotiate renewals.
+</Tip>
+
+### Renewal Process
+
+1. **Review Coverage** - Assess if support is still needed
+2. **Verify Assets** - Confirm covered equipment is still in use
+3. **Get Quote** - Request renewal pricing from vendor
+4. **Budget Approval** - Secure funding for renewal
+5. **Process Purchase** - Issue PO and complete renewal
+6. **Update Record** - Update contract with new dates and terms
+
+## Integration
+
+### Assets
+
+Support contracts integrate with asset management:
+
+- View supports from asset detail pages
+- Add supports during asset deployment
+- Track support history per asset
+- Include in asset reports
+- Link to warranty information
+
+### Transitions
+
+Automate support tracking in workflows:
+
+- Verify support coverage during deployment
+- Check warranty status before decommission
+- Require support assignment for critical assets
+
+### Attachments
+
+Attach relevant documentation:
+
+- Contract PDFs and agreements
+- Service documentation
+- Support call records
+- SLA documentation
+- Renewal quotes
+
+## Reporting
+
+### Standard Reports
+
+**Active Supports**
+- All current support contracts
+- Grouped by vendor or asset type
+- Total contract values
+
+**Expiring Supports**
+- Contracts expiring in next 30/60/90 days
+- Renewal action required
+- Budget impact analysis
+
+**Asset Coverage**
+- Assets with active support
+- Assets without support coverage
+- Support costs per asset
+
+**Vendor Analysis**
+- Support contracts by vendor
+- Total spending per vendor
+- Service level comparison
+
+### Custom Reports via API
+
+```bash
+# Get all supports
+curl https://ralph.example.com/api/supports/
+
+# Get supports expiring soon
+curl https://ralph.example.com/api/supports/?date_to__lt=2024-12-31
+
+# Get supports for specific asset
+curl https://ralph.example.com/api/supports/?base_objects=123
+```
+
+## Best Practices
+
+<Tip>
+**Document Everything**: Use the escalation path and contract terms fields. During a critical outage, you don't want to be searching for support contact information.
+</Tip>
+
+<Tip>
+**Set Date_From**: Even though it's optional, always set the start date. This helps calculate total contract duration and track multi-year agreements.
+</Tip>
+
+<Tip>
+**Regular Reviews**: Quarterly, review all support contracts to:
+- Verify assets are still in use
+- Check if support level is appropriate
+- Identify opportunities to consolidate contracts
+- Prepare for upcoming renewals
+</Tip>
+
+<Note>
+Attach vendor contracts and service documentation to the support record. Having the full contract searchable in Ralph is invaluable when disputes arise.
+</Note>
+
+## Common Workflows
+
+### New Equipment Purchase
+
+1. Purchase equipment with warranty
+2. Create asset in Ralph
+3. Create support record for warranty
+4. Link support to asset
+5. Set expiration reminder
+
+### Warranty Expiration
+
+1. Report shows warranty expiring in 60 days
+2. Assess if extended support needed
+3. Request quote from vendor
+4. If approved, purchase extension
+5. Update support record with new dates
+6. If not approved, mark as expired
+
+### Support Incident
+
+1. Issue occurs with equipment
+2. Open asset in Ralph
+3. Check Supports tab for coverage
+4. Reference contract ID and escalation path
+5. Contact vendor using documented process
+6. Document incident in asset notes
+
+### Asset Decommission
+
+1. Asset marked for retirement
+2. Review support contracts
+3. Remove asset from support assignments
+4. Consider if support can be transferred
+5. Update or cancel support if only asset covered
+
+## Differences from Licenses
+
+While similar in concept, supports differ from licenses:
+
+| Feature | Supports | Licenses |
+|---------|----------|----------|
+| Purpose | Service contracts & warranties | Software licensing |
+| Assigns to | Assets only | Assets and users |
+| Quantity | No limit tracking | Tracks free/used |
+| Key Field | Contract ID | Serial number/key |
+| Expiration | Required date_to | Optional validity |
+| Type | Support type | License type (per-user, etc.) |
+
+<Card title="Next Steps" icon="arrow-right">
+  Discover workflow automation with [Workflows & Transitions](/features/workflows)
+</Card>

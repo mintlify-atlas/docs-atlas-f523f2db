@@ -1,0 +1,407 @@
+---
+title: "Ralph CLI"
+description: "Command-line interface for managing Ralph installations"
+---
+
+Ralph provides several command-line tools for managing your Ralph installation, running development servers, and executing various operations.
+
+## Available Commands
+
+Ralph includes the following command-line entry points:
+
+### ralph
+
+The main production command for running Ralph.
+
+```bash
+ralph <django-command> [options]
+```
+
+This command uses the production settings (`ralph.settings.prod`) and provides access to all Django management commands.
+
+**Common Usage:**
+
+```bash
+# Run database migrations
+ralph migrate
+
+# Create a superuser
+ralph createsuperuser
+
+# Collect static files
+ralph collectstatic
+
+# Run the development server
+ralph runserver 0.0.0.0:8000
+
+# Open Django shell
+ralph shell
+
+# Create database backup
+ralph dumpdata > backup.json
+
+# Load data from backup
+ralph loaddata backup.json
+```
+
+### dev_ralph
+
+Development version of Ralph with development-specific settings.
+
+```bash
+dev_ralph <django-command> [options]
+```
+
+This command uses development settings (`ralph.settings.dev`) which typically include:
+- Debug mode enabled
+- Development-specific middleware
+- Verbose logging
+- Development database settings
+
+**Example:**
+
+```bash
+# Run development server with dev settings
+dev_ralph runserver
+
+# Run migrations with dev settings
+dev_ralph migrate
+```
+
+### test_ralph
+
+Test runner for Ralph with test-specific settings.
+
+```bash
+test_ralph test [app_label[.TestCase[.test_method]]] [options]
+```
+
+This command uses test settings (`ralph.settings.test`) and forces their use regardless of environment variables. Test settings typically include:
+- In-memory database for faster tests
+- Disabled migrations
+- Test-specific configurations
+
+**Examples:**
+
+```bash
+# Run all tests
+test_ralph test
+
+# Run tests for a specific app
+test_ralph test ralph.data_center
+
+# Run a specific test case
+test_ralph test ralph.data_center.tests.test_models.DataCenterAssetTest
+
+# Run tests with verbosity
+test_ralph test --verbosity=2
+
+# Run tests and keep test database
+test_ralph test --keepdb
+```
+
+### validate_ralph
+
+Cross-validation tool for Ralph data integrity.
+
+```bash
+validate_ralph [options]
+```
+
+This command validates data consistency across Ralph's database, checking for:
+- Orphaned records
+- Invalid foreign key references
+- Data integrity violations
+- Configuration issues
+
+**Example:**
+
+```bash
+# Run validation
+validate_ralph
+```
+
+## Django Management Commands
+
+Ralph is built on Django, so all Django management commands are available through the Ralph CLI.
+
+### Database Commands
+
+```bash
+# Show migrations status
+ralph showmigrations
+
+# Create new migrations based on model changes
+ralph makemigrations
+
+# Apply migrations
+ralph migrate
+
+# Rollback to a specific migration
+ralph migrate data_center 0005
+
+# Show SQL for a migration
+ralph sqlmigrate data_center 0006
+```
+
+### User Management
+
+```bash
+# Create a superuser
+ralph createsuperuser
+
+# Change user password
+ralph changepassword username
+```
+
+### Static Files
+
+```bash
+# Collect static files to STATIC_ROOT
+ralph collectstatic
+
+# Collect static files without prompts
+ralph collectstatic --noinput
+
+# Find which static file would be used
+ralph findstatic admin/css/base.css
+```
+
+### Database Shell
+
+```bash
+# Open database shell
+ralph dbshell
+```
+
+### Python Shell
+
+```bash
+# Open Python shell with Django environment loaded
+ralph shell
+
+# Use IPython if available
+ralph shell -i ipython
+
+# Use BPython if available
+ralph shell -i bpython
+```
+
+## Ralph-Specific Commands
+
+Ralph extends Django with custom management commands for specific operations.
+
+### LDAP Synchronization
+
+Synchronize users from LDAP/Active Directory:
+
+```bash
+ralph ldap_sync
+```
+
+This command:
+- Connects to configured LDAP server
+- Imports users matching filter criteria
+- Updates existing user information
+- Syncs group memberships
+- Reports progress every 100 items
+
+See the [Configuration](/installation/configuration) section for LDAP setup details.
+
+### OpenStack Synchronization
+
+Sync cloud resources from OpenStack:
+
+```bash
+ralph openstack_sync
+```
+
+This command:
+- Connects to configured OpenStack instances
+- Downloads projects and instances
+- Creates/updates Cloud Projects and Cloud Hosts in Ralph
+- Deletes resources no longer in OpenStack
+- Tags resources with configured tags
+
+See the [Configuration](/installation/configuration) section for OpenStack setup.
+
+### Data Import
+
+Import data from various sources:
+
+```bash
+# Import from CSV/Excel files
+ralph import --help
+```
+
+## Environment Variables
+
+Ralph CLI commands respect several environment variables:
+
+<ParamField path="DJANGO_SETTINGS_MODULE" type="string">
+  Override the Django settings module. Default varies by command:
+  - `ralph`: `ralph.settings.prod`
+  - `dev_ralph`: `ralph.settings.dev`
+  - `test_ralph`: `ralph.settings.test` (forced)
+</ParamField>
+
+<ParamField path="RALPH_DEBUG" type="boolean">
+  Enable debug mode. Not recommended for production.
+</ParamField>
+
+<ParamField path="DATABASE_URL" type="string">
+  Database connection string (e.g., `mysql://user:pass@localhost/dbname`)
+</ParamField>
+
+<ParamField path="SECRET_KEY" type="string">
+  Django secret key for cryptographic signing. Must be set in production.
+</ParamField>
+
+**Example:**
+
+```bash
+# Run with specific settings
+DJANGO_SETTINGS_MODULE=ralph.settings.local ralph runserver
+
+# Run with custom database
+DATABASE_URL=mysql://ralph:password@db.example.com/ralph ralph migrate
+```
+
+## Running in Production
+
+### Using systemd
+
+Create a systemd service file (`/etc/systemd/system/ralph.service`):
+
+```ini
+[Unit]
+Description=Ralph Asset Management
+After=network.target postgresql.service
+
+[Service]
+Type=notify
+User=ralph
+Group=ralph
+WorkingDirectory=/opt/ralph
+Environment="DATABASE_URL=postgresql://ralph:password@localhost/ralph"
+Environment="SECRET_KEY=your-secret-key-here"
+ExecStart=/opt/ralph/venv/bin/gunicorn ralph.wsgi:application \
+    --bind 0.0.0.0:8000 \
+    --workers 4 \
+    --timeout 300
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start the service:
+
+```bash
+sudo systemctl enable ralph
+sudo systemctl start ralph
+sudo systemctl status ralph
+```
+
+### Using Supervisor
+
+Create a supervisor config (`/etc/supervisor/conf.d/ralph.conf`):
+
+```ini
+[program:ralph]
+command=/opt/ralph/venv/bin/gunicorn ralph.wsgi:application --bind 0.0.0.0:8000 --workers 4
+directory=/opt/ralph
+user=ralph
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/ralph/ralph.log
+environment=DATABASE_URL="postgresql://ralph:password@localhost/ralph",SECRET_KEY="your-secret-key"
+```
+
+Reload supervisor:
+
+```bash
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl start ralph
+```
+
+## Scheduled Tasks
+
+Use cron or systemd timers for periodic tasks:
+
+```bash
+# Add to crontab
+crontab -e
+```
+
+```cron
+# Sync LDAP users daily at 2 AM
+0 2 * * * /opt/ralph/venv/bin/ralph ldap_sync
+
+# Sync OpenStack every hour
+0 * * * * /opt/ralph/venv/bin/ralph openstack_sync
+
+# Cleanup old sessions weekly
+0 3 * * 0 /opt/ralph/venv/bin/ralph clearsessions
+```
+
+## Debugging
+
+### Enable Verbose Output
+
+Most commands support verbosity levels:
+
+```bash
+# Minimal output
+ralph migrate --verbosity=0
+
+# Normal output (default)
+ralph migrate --verbosity=1
+
+# Verbose output
+ralph migrate --verbosity=2
+
+# Very verbose output
+ralph migrate --verbosity=3
+```
+
+### Check Configuration
+
+```bash
+# Check for common issues
+ralph check
+
+# Check deployment settings
+ralph check --deploy
+
+# Check specific subsystem
+ralph check --tag models
+```
+
+### Database Queries
+
+Monitor SQL queries during development:
+
+```bash
+# Show SQL for specific commands
+ralph migrate --verbosity=3
+
+# Or use Django Debug Toolbar in development
+```
+
+## Getting Help
+
+Get help for any command:
+
+```bash
+# General help
+ralph help
+
+# List all available commands
+ralph help --commands
+
+# Help for a specific command
+ralph help migrate
+ralph migrate --help
+```

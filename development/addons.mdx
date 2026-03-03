@@ -1,0 +1,650 @@
+---
+title: Plugin & Addon Development 
+description: Extend Ralph with custom plugins, views, and integrations without modifying core code
+---
+
+# Plugin & Addon Development
+
+Ralph is designed to be extended through plugins and addons without modifying the core codebase. This guide covers different extension mechanisms and best practices.
+
+## Extension Methods
+
+Ralph supports several ways to extend functionality:
+
+1. **Custom admin views and tabs** - Add new pages to existing models
+2. **External Django apps** - Integrate standalone Django applications
+3. **Entry point hooks** - Override specific behaviors via setup.py entry points
+4. **Custom filters** - Add specialized search and filter capabilities
+5. **Signals and receivers** - React to events in Ralph
+
+## Custom Admin Views
+
+### Adding Tabs to Detail Views
+
+Add custom tabs to model detail pages using `RalphDetailView` or `RalphDetailViewAdmin`:
+
+```python
+from ralph.admin.views.extra import RalphDetailView, RalphDetailViewAdmin
+from ralph.admin import RalphTabularInline
+from ralph.admin.decorators import register_extra_view
+from myapp.models import Asset
+from django.shortcuts import render
+
+class CustomReportView(RalphDetailView):
+    icon = 'chart-bar'
+    name = 'custom_report'
+    label = 'Usage Report'
+    url_name = 'asset_usage_report'
+    template_name = 'myapp/asset_usage_report.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # self.object is the current Asset instance
+        context['usage_stats'] = self.calculate_usage(self.object)
+        context['cost_analysis'] = self.analyze_costs(self.object)
+        return context
+    
+    def calculate_usage(self, asset):
+        # Your custom logic
+        return {'cpu': 75, 'memory': 60, 'disk': 45}
+    
+    def analyze_costs(self, asset):
+        return {'monthly': 150.00, 'yearly': 1800.00}
+```
+
+Template (`myapp/templates/myapp/asset_usage_report.html`):
+
+```django
+{% extends BASE_TEMPLATE %}
+
+{% block content %}
+<div class="usage-report">
+    <h2>Usage Statistics for {{ object.hostname }}</h2>
+    
+    <div class="stats">
+        <h3>Resource Usage</h3>
+        <ul>
+            <li>CPU: {{ usage_stats.cpu }}%</li>
+            <li>Memory: {{ usage_stats.memory }}%</li>
+            <li>Disk: {{ usage_stats.disk }}%</li>
+        </ul>
+    </div>
+    
+    <div class="costs">
+        <h3>Cost Analysis</h3>
+        <ul>
+            <li>Monthly: ${{ cost_analysis.monthly }}</li>
+            <li>Yearly: ${{ cost_analysis.yearly }}</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+```
+
+Source: `docs/development/addons.md:14-64`
+
+### Using RalphDetailViewAdmin
+
+For standard admin-style tabs with inlines:
+
+```python
+from ralph.admin.views.extra import RalphDetailViewAdmin
+from ralph.admin import RalphTabularInline
+from ralph.networks.models import IPAddress
+
+class NetworkInline(RalphTabularInline):
+    model = IPAddress
+    extra = 1
+    fields = ['address', 'hostname', 'is_management']
+    raw_id_fields = ['ethernet']
+
+class NetworkView(RalphDetailViewAdmin):
+    icon = 'wifi'
+    name = 'network'
+    label = 'Network Configuration'
+    url_name = 'asset_network'
+    inlines = [NetworkInline]
+```
+
+Source: `docs/development/addons.md:39-51`
+
+### Registering Views
+
+#### Method 1: Via Admin Class (Internal Development)
+
+Use when developing directly in Ralph:
+
+```python
+from ralph.admin import RalphAdmin, register
+from ralph.admin.views.extra import RalphDetailView
+from myapp.models import Asset
+
+@register(Asset)
+class AssetAdmin(RalphAdmin):
+    list_display = ['hostname', 'barcode', 'status']
+    
+    # Add custom views to detail page
+    change_views = [
+        CustomReportView,
+        NetworkView,
+        ComponentsView,
+    ]
+```
+
+Source: `docs/development/addons.md:77-96`
+
+#### Method 2: Via Decorator (External Plugins)
+
+Recommended for external applications and plugins:
+
+```python
+from ralph.admin.decorators import register_extra_view
+from ralph.admin.views.extra import RalphDetailView
+from ralph.back_office.models import BackOfficeAsset
+
+@register_extra_view(BackOfficeAsset, register_extra_view.CHANGE)
+class MonitoringView(RalphDetailView):
+    icon = 'pulse'
+    name = 'monitoring'
+    label = 'Live Monitoring'
+    url_name = 'asset_monitoring'
+    template_name = 'myplugin/monitoring.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['metrics'] = self.fetch_metrics(self.object)
+        return context
+    
+    def fetch_metrics(self, asset):
+        # Fetch from monitoring system
+        return {
+            'uptime': '99.9%',
+            'response_time': '45ms',
+            'errors': 0
+        }
+```
+
+Source: `docs/development/addons.md:98-114`
+
+### Template Locations
+
+Templates must be in one of these locations:
+
+- `<model_name>/<view_name>.html`
+- `<app_label>/<model_name>/<view_name>.html`
+
+For example, for `BackOfficeAsset` model with view name `monitoring`:
+- `backofficeasset/monitoring.html`
+- `back_office/backofficeasset/monitoring.html`
+
+Source: `docs/development/addons.md:66-76`
+
+## Entry Point Hooks
+
+Override Ralph's internal methods using setuptools entry points.
+
+### Defining Entry Points
+
+In your plugin's `setup.py`:
+
+```python
+from setuptools import setup, find_packages
+
+setup(
+    name='ralph-custom-plugin',
+    version='1.0.0',
+    packages=find_packages(),
+    install_requires=['ralph'],
+    
+    entry_points={
+        # Override email context for transitions
+        'back_office.transition_action.email_context': [
+            'custom_email = myplugin.helpers:get_custom_email_context',
+        ],
+        # Override asset list class
+        'account.views.get_asset_list_class': [
+            'custom_assets = myplugin.views:get_custom_asset_list_class',
+        ],
+        # Add cloud sync processor
+        'ralph.cloud_sync_processors': [
+            'aws_sync = myplugin.processors.aws:endpoint',
+        ],
+    },
+)
+```
+
+Source: `docs/development/addons.md:128-146`, `src/ralph/setup.py:37-53`
+
+### Implementing Hooks
+
+In your plugin code (`myplugin/helpers.py`):
+
+```python
+from collections import namedtuple
+
+EmailContext = namedtuple('EmailContext', ['subject', 'body'])
+
+def get_custom_email_context(transition_name):
+    """Custom email templates for transitions."""
+    templates = {
+        'deploy': EmailContext(
+            subject='Asset Deployment Started',
+            body='Your asset deployment has been initiated. Track progress at: {url}'
+        ),
+        'return': EmailContext(
+            subject='Asset Return Processed',
+            body='Asset return has been processed. Please confirm receipt.'
+        ),
+    }
+    return templates.get(
+        transition_name.lower(),
+        EmailContext(
+            subject=f'Transition: {transition_name}',
+            body='A transition has been executed.'
+        )
+    )
+```
+
+Source: `docs/development/addons.md:128-165`
+
+### Available Hooks
+
+| Hook Name | Description | Parameters | Return Value |
+|-----------|-------------|------------|-------------|
+| `back_office.transition_action.email_context` | Email templates for transitions | `transition_name: str` | `EmailContext(subject, body)` |
+| `account.views.get_asset_list_class` | Custom asset list view | - | View class |
+| `ralph.cloud_sync_processors` | Cloud synchronization processor | - | Processor endpoint |
+
+Source: `docs/development/addons.md:149-153`
+
+### Configuring Hooks
+
+Activate hooks via environment variables:
+
+```bash
+# Convert hook name to uppercase and replace dots with underscores
+export HOOKS_BACK_OFFICE_TRANSITION_ACTION_EMAIL_CONTEXT=custom_email
+
+# Start Ralph with the custom hook
+ralph runserver
+```
+
+Verify active hooks:
+
+```bash
+ralph show_hooks_configuration
+
+# Output:
+# Hooks:
+#     back_office.transition_action.email_context:
+#             default
+#             custom_email (active)
+```
+
+Source: `docs/development/addons.md:154-165`
+
+## External Django Apps
+
+Integrate standalone Django applications with Ralph.
+
+### Creating a Plugin App
+
+Project structure:
+
+```
+ralph-monitoring-plugin/
+├── setup.py
+├── README.md
+└── ralph_monitoring/
+    ├── __init__.py
+    ├── apps.py
+    ├── models.py
+    ├── admin.py
+    ├── views.py
+    ├── urls.py
+    ├── migrations/
+    │   └── __init__.py
+    └── templates/
+        └── ralph_monitoring/
+            └── dashboard.html
+```
+
+### App Configuration
+
+`ralph_monitoring/apps.py`:
+
+```python
+from django.apps import AppConfig
+
+class RalphMonitoringConfig(AppConfig):
+    name = 'ralph_monitoring'
+    verbose_name = 'Ralph Monitoring Plugin'
+    
+    def ready(self):
+        # Import signal handlers
+        from . import signals  # noqa
+        
+        # Register custom views
+        from . import admin_extensions  # noqa
+```
+
+### Models
+
+`ralph_monitoring/models.py`:
+
+```python
+from django.db import models
+from ralph.assets.models.base import BaseObject
+from ralph.lib.mixins.models import TimeStampMixin
+
+class MonitoringMetric(TimeStampMixin, models.Model):
+    asset = models.ForeignKey(
+        BaseObject,
+        on_delete=models.CASCADE,
+        related_name='monitoring_metrics'
+    )
+    metric_name = models.CharField(max_length=100)
+    value = models.FloatField()
+    unit = models.CharField(max_length=20)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['asset', '-timestamp']),
+        ]
+```
+
+### Admin Integration
+
+`ralph_monitoring/admin.py`:
+
+```python
+from ralph.admin import RalphAdmin, register
+from ralph.admin.views.extra import RalphDetailView
+from ralph.admin.decorators import register_extra_view
+from ralph.assets.models import BaseObject
+from .models import MonitoringMetric
+
+@register(MonitoringMetric)
+class MonitoringMetricAdmin(RalphAdmin):
+    list_display = ['asset', 'metric_name', 'value', 'unit', 'timestamp']
+    list_filter = ['metric_name', 'timestamp']
+    search_fields = ['asset__hostname']
+    raw_id_fields = ['asset']
+
+@register_extra_view(BaseObject, register_extra_view.CHANGE)
+class AssetMonitoringView(RalphDetailView):
+    icon = 'chart-line'
+    name = 'monitoring'
+    label = 'Monitoring'
+    url_name = 'asset_monitoring'
+    template_name = 'ralph_monitoring/asset_metrics.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['recent_metrics'] = MonitoringMetric.objects.filter(
+            asset=self.object
+        )[:100]
+        context['metric_types'] = MonitoringMetric.objects.filter(
+            asset=self.object
+        ).values_list('metric_name', flat=True).distinct()
+        return context
+```
+
+### URL Configuration
+
+`ralph_monitoring/urls.py`:
+
+```python
+from django.urls import path
+from . import views
+
+app_name = 'ralph_monitoring'
+
+urlpatterns = [
+    path('api/metrics/', views.MetricsAPIView.as_view(), name='metrics_api'),
+    path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
+]
+```
+
+### Installation
+
+`setup.py`:
+
+```python
+from setuptools import setup, find_packages
+
+setup(
+    name='ralph-monitoring-plugin',
+    version='1.0.0',
+    description='Monitoring plugin for Ralph',
+    author='Your Name',
+    packages=find_packages(),
+    include_package_data=True,
+    install_requires=[
+        'ralph>=3.0.0',
+    ],
+    entry_points={
+        'console_scripts': [
+            'ralph-monitoring-setup = ralph_monitoring.management:setup',
+        ],
+    },
+    classifiers=[
+        'Framework :: Django',
+        'Programming Language :: Python :: 3',
+    ],
+)
+```
+
+Install and configure:
+
+```bash
+# Install the plugin
+pip install ralph-monitoring-plugin
+
+# Add to settings
+# In your Ralph settings file:
+INSTALLED_APPS = [
+    # ... other apps
+    'ralph_monitoring',
+]
+
+# Run migrations
+ralph migrate ralph_monitoring
+
+# Collect static files
+ralph collectstatic --noinput
+```
+
+## Custom Filters
+
+Create specialized admin filters:
+
+```python
+from ralph.admin.filters import TextFilter, ChoicesFilter, DateFilter
+from django.utils.translation import gettext_lazy as _
+
+class CPUFilter(ChoicesFilter):
+    title = _('CPU Type')
+    parameter_name = 'cpu_type'
+    choices_list = [
+        ('intel', 'Intel'),
+        ('amd', 'AMD'),
+        ('arm', 'ARM'),
+    ]
+
+class MemoryRangeFilter(ChoicesFilter):
+    title = _('Memory Range')
+    parameter_name = 'memory_range'
+    choices_list = [
+        ('0-16', '0-16 GB'),
+        ('17-32', '17-32 GB'),
+        ('33-64', '33-64 GB'),
+        ('65+', '65+ GB'),
+    ]
+    
+    def queryset(self, request, queryset):
+        value = self.value()
+        if not value:
+            return queryset
+        
+        if value == '0-16':
+            return queryset.filter(memory__lte=16)
+        elif value == '17-32':
+            return queryset.filter(memory__gte=17, memory__lte=32)
+        elif value == '33-64':
+            return queryset.filter(memory__gte=33, memory__lte=64)
+        elif value == '65+':
+            return queryset.filter(memory__gte=65)
+        
+        return queryset
+
+@register(Server)
+class ServerAdmin(RalphAdmin):
+    list_filter = [CPUFilter, MemoryRangeFilter, 'status']
+```
+
+## Signals and Event Handlers
+
+React to events in Ralph:
+
+```python
+from django.db.models.signals import post_save, pre_delete
+from django.dispatch import receiver
+from ralph.assets.models import BaseObject
+from ralph.lib.transitions.models import TransitionsHistory
+import logging
+
+logger = logging.getLogger(__name__)
+
+@receiver(post_save, sender=BaseObject)
+def on_asset_created(sender, instance, created, **kwargs):
+    """Send notification when new asset is created."""
+    if created:
+        logger.info(f'New asset created: {instance.hostname}')
+        send_notification(
+            f'New {instance._meta.verbose_name} added',
+            f'{instance.hostname} has been added to inventory'
+        )
+
+@receiver(post_save, sender=TransitionsHistory)
+def on_transition_executed(sender, instance, created, **kwargs):
+    """Log transition execution to external system."""
+    if created:
+        log_to_external_system(
+            event='transition',
+            object_id=instance.object_id,
+            transition=instance.transition_name,
+            user=instance.logged_user.username,
+        )
+```
+
+## Best Practices
+
+### 1. Use Decorators for External Plugins
+
+Always use `@register_extra_view` for external plugins instead of modifying admin classes:
+
+```python
+# Good - works from external package
+@register_extra_view(Asset, register_extra_view.CHANGE)
+class MyView(RalphDetailView):
+    pass
+
+# Bad - requires modifying Ralph code
+class AssetAdmin(RalphAdmin):
+    change_views = [MyView]  # Only works if you can edit this file
+```
+
+### 2. Namespace Your URLs and Templates
+
+Avoid conflicts by using consistent naming:
+
+```python
+# Good
+app_name = 'myplugin'
+template_name = 'myplugin/dashboard.html'
+url_name = 'myplugin_dashboard'
+
+# Bad
+template_name = 'dashboard.html'  # May conflict
+url_name = 'dashboard'  # May conflict
+```
+
+### 3. Use Entry Points for Behavior Changes
+
+Don't monkey-patch Ralph code. Use entry points:
+
+```python
+# Good - via entry point
+entry_points={
+    'back_office.transition_action.email_context': [
+        'custom = myplugin.helpers:get_email_context',
+    ],
+}
+
+# Bad - monkey patching
+import ralph.back_office.helpers
+ralph.back_office.helpers.get_email_context = my_function
+```
+
+### 4. Follow Ralph Conventions
+
+- Inherit from Ralph base classes (`RalphAdmin`, `RalphDetailView`)
+- Use Ralph mixins (`TimeStampMixin`, `AdminAbsoluteUrlMixin`)
+- Follow Ralph's permission system
+- Use Ralph's form and widget classes
+
+### 5. Handle Dependencies
+
+Declare Ralph as a dependency:
+
+```python
+# setup.py
+install_requires=[
+    'ralph>=3.0.0',
+],
+```
+
+### 6. Provide Documentation
+
+Include README with:
+- Installation instructions
+- Configuration options
+- Usage examples
+- Dependencies
+- License information
+
+## Example Plugin Package
+
+Complete example of a monitoring plugin:
+
+```bash
+# Install
+pip install ralph-monitoring-plugin
+
+# Configure
+export RALPH_MONITORING_API_KEY="your-key"
+export RALPH_MONITORING_ENDPOINT="https://monitoring.example.com"
+
+# Add to settings
+INSTALLED_APPS += ['ralph_monitoring']
+
+# Migrate
+ralph migrate
+```
+
+The plugin provides:
+- Custom tab on asset detail pages showing real-time metrics
+- Admin interface for historical metrics
+- API endpoint for pushing metrics from external systems
+- Dashboard view for monitoring overview
+- Signal handlers for automatic metric collection
+
+## Next Steps
+
+- Review [RalphAdmin customization](/development/admin) for admin features
+- Learn about [Transitions](/development/transitions) for workflow integration
+- Explore [Custom Fields](/development/custom-fields) for data extension
+- Read the [API documentation](/development/api) for REST API integration

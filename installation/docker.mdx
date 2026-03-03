@@ -1,0 +1,381 @@
+---
+title: Docker Installation
+description: Deploy Ralph using Docker and Docker Compose for quick setup and isolated environments
+---
+
+This guide covers deploying Ralph using Docker containers. This method is ideal for development, testing, and containerized production environments.
+
+## Overview
+
+The Docker installation uses official Ralph images:
+
+- **allegro/ralph:latest** - Main Ralph application
+- **allegro/ralph-static-nginx:latest** - Nginx server for static files
+- **mysql:5.7** - Database server
+- **redis:3.0** - Cache and task queue
+
+## Prerequisites
+
+- Docker Engine 20.10+
+- Docker Compose 2.0+
+- 4GB+ RAM available for containers
+- 10GB+ disk space
+
+## Quick Start
+
+<Steps>
+  <Step title="Install Docker and Docker Compose">
+    If you don't have Docker installed, follow the official installation guide:
+
+    - [Install Docker Engine](https://docs.docker.com/engine/install/)
+    - [Install Docker Compose](https://docs.docker.com/compose/install/)
+
+    Verify installation:
+
+    ```bash
+    docker --version
+    docker-compose --version
+    ```
+  </Step>
+
+  <Step title="Create Docker Compose Configuration">
+    Create a new directory for Ralph and a `docker-compose.yml` file:
+
+    ```bash
+    mkdir ralph-docker
+    cd ralph-docker
+    nano docker-compose.yml
+    ```
+
+    Add the following configuration:
+
+    ```yaml docker-compose.yml
+    version: '3'
+    services:
+      web:
+        platform: linux/amd64
+        image: allegro/ralph:latest
+        restart: always
+        ports:
+          - "8000"
+        volumes:
+          - ralph_media:/var/local/ralph/media
+          - ralph_static:/usr/share/ralph/static
+        links:
+          - db
+          - redis
+          - nginx
+        environment:
+          DATABASE_NAME: ralph_ng
+          DATABASE_USER: ralph_ng
+          DATABASE_PASSWORD: ralph_ng
+          DATABASE_HOST: db
+          REDIS_HOST: redis
+          REDIS_PASSWORD: ""
+          REDIS_PORT: 6379
+          REDIS_DB: 0
+
+      nginx:
+        platform: linux/amd64
+        image: allegro/ralph-static-nginx:latest
+        restart: always
+        ports:
+          - "80:80"
+        volumes:
+          - ralph_media:/opt/media
+
+      db:
+        platform: linux/amd64
+        image: mysql:5.7
+        environment:
+          MYSQL_DATABASE: ralph_ng
+          MYSQL_ROOT_PASSWORD: ralph_ng
+          MYSQL_USER: ralph_ng
+          MYSQL_PASSWORD: ralph_ng
+        volumes:
+          - ralph_dbdata:/var/lib/mysql
+        command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+      redis:
+        platform: linux/amd64
+        image: redis:3.0
+        restart: always
+        ports:
+          - "6379"
+
+      inkpy:
+        platform: linux/amd64
+        image: allegro/ralph:latest
+        restart: always
+        links:
+          - redis:redis
+        environment:
+          REDIS_HOST: redis
+          REDIS_PASSWORD: ""
+          REDIS_PORT: 6379
+          REDIS_DB: 0
+
+    volumes:
+      ralph_dbdata:
+      ralph_media:
+      ralph_static:
+    ```
+
+    <Warning>
+      This configuration uses default passwords. For production, change all passwords to strong, unique values.
+    </Warning>
+  </Step>
+
+  <Step title="Pull Docker Images">
+    Download the required Docker images:
+
+    ```bash
+    docker-compose pull
+    ```
+  </Step>
+
+  <Step title="Initialize Database">
+    Initialize the Ralph database (run this only once):
+
+    ```bash
+    docker-compose run --rm web /var/local/ralph/init-ralph.sh init
+    ```
+
+    This will:
+    - Run database migrations
+    - Sync the application menu tree
+    - Create a default superuser
+
+    <Note>
+      The initialization script will prompt you to create a superuser account. Save these credentials securely.
+    </Note>
+  </Step>
+
+  <Step title="Load Demo Data (Optional)">
+    To populate Ralph with demonstration data:
+
+    ```bash
+    docker-compose run --rm web ralph demodata
+    ```
+  </Step>
+
+  <Step title="Start Ralph">
+    Start all services:
+
+    ```bash
+    docker-compose up -d
+    ```
+
+    Ralph will be available at:
+    - **Web Interface**: [http://localhost](http://localhost)
+    - **API Documentation**: [http://localhost/docs](http://localhost/docs)
+
+    <Tip>
+      If using Docker Toolbox or boot2docker, use `$(docker-machine ip)` instead of `localhost`.
+    </Tip>
+  </Step>
+</Steps>
+
+## Container Management
+
+### View Running Containers
+
+```bash
+# List all containers
+docker-compose ps
+
+# View logs from all services
+docker-compose logs -f
+
+# View logs from specific service
+docker-compose logs -f web
+```
+
+### Stop and Start Services
+
+```bash
+# Stop all services
+docker-compose stop
+
+# Start all services
+docker-compose start
+
+# Restart all services
+docker-compose restart
+
+# Stop and remove containers
+docker-compose down
+```
+
+### Upgrade Ralph
+
+<Steps>
+  <Step title="Pull Latest Images">
+    ```bash
+    docker-compose pull
+    ```
+  </Step>
+
+  <Step title="Run Upgrade Script">
+    ```bash
+    docker-compose run --rm web /var/local/ralph/init-ralph.sh upgrade
+    ```
+  </Step>
+
+  <Step title="Restart Services">
+    ```bash
+    docker-compose up -d
+    ```
+  </Step>
+</Steps>
+
+## Environment Variables
+
+Customize Ralph by setting environment variables in the `docker-compose.yml` file:
+
+### Database Configuration
+
+```yaml
+environment:
+  DATABASE_NAME: ralph_ng        # Database name
+  DATABASE_USER: ralph_ng        # Database username
+  DATABASE_PASSWORD: ralph_ng    # Database password
+  DATABASE_HOST: db              # Database host
+  DATABASE_PORT: 3306           # Database port (optional)
+  DATABASE_ENGINE: mysql        # mysql or postgresql
+```
+
+### Redis Configuration
+
+```yaml
+environment:
+  REDIS_HOST: redis             # Redis server host
+  REDIS_PORT: 6379              # Redis port
+  REDIS_DB: 0                   # Redis database number
+  REDIS_PASSWORD: ""            # Redis password (if set)
+```
+
+### Additional Settings
+
+```yaml
+environment:
+  RALPH_DEBUG: 0                # Debug mode (0 or 1)
+  STATIC_ROOT: /usr/share/ralph/static
+  MEDIA_ROOT: /var/local/ralph/media
+  LOG_FILEPATH: /var/log/ralph/ralph.log
+```
+
+## Data Persistence
+
+Data is stored in Docker volumes to persist across container restarts:
+
+- **ralph_dbdata** - MySQL database files
+- **ralph_media** - User-uploaded media files
+- **ralph_static** - Static assets (CSS, JS, images)
+
+### Backup Volumes
+
+```bash
+# Backup database
+docker-compose exec db mysqldump -u ralph_ng -pralph_ng ralph_ng > backup.sql
+
+# Restore database
+docker-compose exec -T db mysql -u ralph_ng -pralph_ng ralph_ng < backup.sql
+```
+
+## Advanced Configuration
+
+### Using PostgreSQL Instead of MySQL
+
+```yaml
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: ralph_ng
+      POSTGRES_USER: ralph_ng
+      POSTGRES_PASSWORD: ralph_ng
+    volumes:
+      - ralph_dbdata:/var/lib/postgresql/data
+
+  web:
+    environment:
+      DATABASE_ENGINE: postgresql
+      DATABASE_NAME: ralph_ng
+      DATABASE_USER: ralph_ng
+      DATABASE_PASSWORD: ralph_ng
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+```
+
+### Running Behind a Reverse Proxy
+
+If running behind nginx or another reverse proxy:
+
+```yaml
+services:
+  nginx:
+    ports:
+      - "8080:80"  # Change port binding
+```
+
+Configure your reverse proxy to forward requests to `http://localhost:8080`.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Containers won't start">
+    Check for port conflicts:
+    ```bash
+    # Check if port 80 is in use
+    sudo lsof -i :80
+    
+    # Check Docker logs
+    docker-compose logs
+    ```
+    
+    Ensure Docker has enough resources (memory, disk space).
+  </Accordion>
+
+  <Accordion title="Database connection errors">
+    The database container may take time to initialize:
+    ```bash
+    # Wait for database to be ready
+    docker-compose logs db
+    
+    # Restart web container after db is ready
+    docker-compose restart web
+    ```
+  </Accordion>
+
+  <Accordion title="Static files not loading">
+    Ensure volumes are properly mounted:
+    ```bash
+    docker-compose down -v  # Remove volumes
+    docker-compose up -d    # Recreate with fresh volumes
+    docker-compose run --rm web ralph collectstatic --noinput
+    ```
+  </Accordion>
+
+  <Accordion title="Permission denied errors">
+    On Linux, you may need to adjust volume permissions:
+    ```bash
+    # Find the volume path
+    docker volume inspect ralph-docker_ralph_media
+    
+    # Adjust permissions (use the path from above)
+    sudo chown -R 1000:1000 /var/lib/docker/volumes/ralph-docker_ralph_media
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/installation/configuration">
+    Configure LDAP, OpenStack sync, and advanced features
+  </Card>
+  <Card title="Data Migration" icon="database" href="/installation/migration">
+    Import existing data or migrate from Ralph 2
+  </Card>
+</CardGroup>

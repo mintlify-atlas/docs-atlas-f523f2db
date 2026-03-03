@@ -1,0 +1,221 @@
+---
+title: 'Introduction to Ralph'
+description: 'Full-featured Asset Management, DCIM and CMDB system for data centers and back offices'
+---
+
+## Welcome to Ralph
+
+Ralph is a powerful, open-source Asset Management, DCIM (Data Center Infrastructure Management), and CMDB (Configuration Management Database) system designed for modern IT infrastructure teams. Whether you're managing thousands of servers across multiple data centers or tracking laptops and mobile devices in your back office, Ralph provides the tools you need.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running with Ralph in minutes. Install, configure, and add your first assets.
+  </Card>
+  <Card title="Data Center Assets" icon="server" href="/data-center/overview">
+    Manage servers, racks, network equipment, and visualize your data center infrastructure.
+  </Card>
+  <Card title="Back Office Assets" icon="laptop" href="/back-office/overview">
+    Track laptops, desktops, printers, mobile phones, and accessories across your organization.
+  </Card>
+  <Card title="API Documentation" icon="code" href="/api/overview">
+    Integrate Ralph with your existing tools using our comprehensive REST API.
+  </Card>
+</CardGroup>
+
+## Core Capabilities
+
+### Asset Lifecycle Management
+
+Track your assets from purchase to retirement with Ralph's comprehensive lifecycle management system. Monitor depreciation, manage warranties, and maintain complete historical records.
+
+- **Purchase tracking** - Record invoice details, purchase dates, and vendor information
+- **Depreciation calculations** - Automatic depreciation based on configurable rules
+- **Full audit trail** - Complete history of all changes and transitions
+- **Custom workflows** - Define status transitions that match your processes
+
+### Data Center Infrastructure
+
+Visualize and manage your entire data center infrastructure with built-in DCIM capabilities.
+
+<CardGroup cols={2}>
+  <Card title="DC Visualization" icon="building">
+    Interactive floor plans showing rack layouts, power distribution, and asset placement in real-time.
+  </Card>
+  <Card title="Rack Management" icon="database">
+    Visual rack layouts with U-position tracking, orientation, and slot management for blade systems.
+  </Card>
+  <Card title="Network Tracking" icon="network-wired">
+    IP address management, DHCP/DNS integration, and network topology visualization.
+  </Card>
+  <Card title="Configuration Paths" icon="folder-tree">
+    Map assets to configuration management tools like Puppet and Ansible.
+  </Card>
+</CardGroup>
+
+### Licensing & Support Management
+
+Never overspend on licenses or miss critical support renewals again.
+
+- **License tracking** - Monitor software licenses with automatic usage calculations
+- **Vendor support** - Track support contracts, SLA agreements, and renewal dates
+- **Allocation management** - Assign licenses per-user or per-core with availability reporting
+- **Cost optimization** - Identify unused licenses and optimize spending
+
+### Flexible Workflow System
+
+Ralph's transitions system allows you to automate asset lifecycle processes.
+
+```python
+# Example: DataCenterAsset status transitions
+from ralph.data_center.models import DataCenterAsset, DataCenterAssetStatus
+
+# Define available statuses
+class DataCenterAssetStatus(Choices):
+    new = _('new')
+    in_use = _('in use')
+    free = _('free')
+    damaged = _('damaged')
+    liquidated = _('liquidated')
+    to_deploy = _('to deploy')
+```
+
+Transitions can trigger:
+- External HTTP webhooks
+- Custom Python scripts
+- Email notifications
+- Report generation
+- Integration with deployment tools
+
+## Multi-Tenant Architecture
+
+<Note>
+  Ralph supports organizing assets across multiple **regions**, **data centers**, and **service environments**, making it perfect for global organizations.
+</Note>
+
+Organize your infrastructure using:
+
+- **Services** - Group assets by business purpose (e.g., "Production Web Servers")
+- **Environments** - Distinguish between production, testing, and development
+- **Regions** - Separate assets by geographic location or business unit
+- **Data Centers** - Manage multiple facilities with independent configurations
+
+## REST API First
+
+Every feature in Ralph is accessible through a comprehensive REST API built on Django REST Framework.
+
+```bash
+# Authenticate and get your API token
+curl -H "Content-Type: application/json" \
+  -X POST https://your-ralph-instance/api-token-auth/ \
+  -d '{"username": "your-username", "password": "your-password"}'
+
+# Fetch a data center asset
+curl -H "Authorization: Token YOUR_TOKEN" \
+  -H "Accept: application/json; version=v1" \
+  https://your-ralph-instance/api/data-center-assets/1/
+```
+
+Response example:
+
+```json
+{
+  "id": 1,
+  "hostname": "web-server-01.datacenter",
+  "status": "in_use",
+  "sn": "SN123456789",
+  "barcode": "BC987654321",
+  "position": 12,
+  "orientation": "front",
+  "service_env": {
+    "service": "Production Web Servers",
+    "environment": "production"
+  },
+  "rack": {
+    "name": "Rack-A1",
+    "server_room": "DC1-Room1"
+  }
+}
+```
+
+## Enterprise Features
+
+### LDAP/Active Directory Integration
+
+Integrate Ralph with your existing user directory for seamless authentication and group management.
+
+```python
+# settings.py example
+AUTHENTICATION_BACKENDS = (
+    'django_auth_ldap.backend.LDAPBackend',
+    'django.contrib.auth.backends.ModelBackend',
+)
+
+AUTH_LDAP_SERVER_URI = "ldap://activedirectory.domain:389"
+AUTH_LDAP_USER_ATTR_MAP = {
+    "first_name": "givenName",
+    "last_name": "sn",
+    "email": "mail",
+}
+```
+
+### Custom Fields
+
+Extend Ralph's data model without code changes using custom fields.
+
+- **Multiple field types** - Text, numbers, dates, choices, URLs
+- **Asset-specific** - Define fields per asset type
+- **API accessible** - Custom fields available via REST API
+- **Configuration variables** - Use as variables in configuration management
+
+### Reporting & Dashboards
+
+Built-in reporting capabilities help you understand your infrastructure:
+
+- License usage and compliance reports
+- Asset depreciation and value reports
+- Data center capacity planning
+- Support contract expiration tracking
+- Custom SQL-based reports
+
+## Live Demo
+
+<Card title="Try Ralph Now" icon="play" href="http://ralph-demo.allegro.tech">
+  Experience Ralph's capabilities with our live demo instance.
+  
+  **Credentials:**
+  - Username: `ralph`
+  - Password: `ralph`
+</Card>
+
+<Warning>
+  The demo instance is reset regularly. Don't store important data there.
+</Warning>
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/installation/overview">
+    Install Ralph on Ubuntu, Docker, or your preferred platform
+  </Card>
+  <Card title="Quick Start Tutorial" icon="graduation-cap" href="/quickstart">
+    Follow our step-by-step guide to add your first assets
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/settings">
+    Configure Ralph to match your organizational needs
+  </Card>
+  <Card title="Development" icon="code-branch" href="/development/architecture">
+    Extend Ralph with custom addons and integrations
+  </Card>
+</CardGroup>
+
+## Open Source & Community
+
+Ralph is open source software provided under the Apache v2.0 License. It's actively maintained by Allegro and has been battle-tested managing thousands of assets in production environments.
+
+- **GitHub Repository**: [allegro/ralph](https://github.com/allegro/ralph)
+- **Community Forum**: [ralph.discourse.group](https://ralph.discourse.group)
+- **License**: Apache License 2.0
+
+<Note>
+  Ralph is maintained under a "Sources only" model. While commercial support is available through the community forum, contributions and pull requests are welcomed but not guaranteed to be merged.
+</Note>

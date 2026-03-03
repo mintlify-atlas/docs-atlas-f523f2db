@@ -1,0 +1,428 @@
+---
+title: Workflows & Transitions
+description: Automate asset lifecycle processes with flexible workflow system supporting custom transitions, actions, and approval processes
+---
+
+Ralph's Transition system provides powerful workflow automation for managing asset lifecycles. Create custom workflows to automate deployments, decommissions, and other asset state changes.
+
+## Overview
+
+The Transitions system enables:
+
+- Automated asset lifecycle workflows
+- Custom transition actions and scripts
+- Status-based workflow controls
+- User input forms for additional data
+- Integration with external systems
+- Bulk transitions on multiple assets
+- Audit trail of all state changes
+
+<CardGroup cols={2}>
+  <Card title="State Transitions" icon="arrow-right-arrow-left">
+    Move assets between statuses with automated actions and validations
+  </Card>
+  
+  <Card title="Custom Actions" icon="code">
+    Execute Python scripts, HTTP calls, or built-in actions during transitions
+  </Card>
+  
+  <Card title="User Forms" icon="input-text">
+    Collect additional information from users during workflow execution
+  </Card>
+  
+  <Card title="Bulk Processing" icon="list-check">
+    Run transitions on multiple assets simultaneously
+  </Card>
+</CardGroup>
+
+## How Transitions Work
+
+Transitions represent changing an asset from one state to another:
+
+```
+Asset Status: NEW → [Run Transition] → Asset Status: IN USE
+```
+
+### Key Concepts
+
+**Status** - The current state of an asset (e.g., new, in use, liquidated)
+
+**Transition** - An action that changes asset status and performs additional tasks
+
+**Source Status** - Required status(es) to run the transition
+
+**Target Status** - Status after transition completes
+
+**Actions** - Scripts or tasks executed during the transition
+
+**User Input** - Additional data collected via forms
+
+## Running Transitions
+
+### Single Asset
+
+From the asset detail page:
+
+1. **Open Asset** - Navigate to asset detail view
+2. **Click Transitions Menu** - Top menu bar shows available transitions
+3. **Select Transition** - Choose appropriate workflow
+4. **Fill Form** - Provide required information if prompted
+5. **Execute** - Confirm to run the transition
+6. **Status Updated** - Asset status changes automatically
+
+### Multiple Assets
+
+From asset list pages:
+
+1. **Navigate to List** - Go to Data Center → Hardware or Back Office → Equipment
+2. **Select Assets** - Check boxes for multiple assets
+3. **Choose Action** - Select transition from actions dropdown
+4. **Fill Form** - Single form applies to all selected assets
+5. **Execute** - Transition runs on all selected assets
+
+<Tip>
+Bulk transitions save significant time when deploying or decommissioning multiple assets. Ensure all selected assets are in compatible statuses.
+</Tip>
+
+## Transition Configuration
+
+Transitions are configured per model type (Data Center Asset, Back Office Asset, etc.).
+
+### Accessing Transition Settings
+
+1. **Navigate** - Settings → Transitions
+2. **Select Model** - Choose asset type (e.g., Data Center Asset)
+3. **View Transitions** - See all configured transitions for this model
+4. **Add/Edit** - Create new or modify existing transitions
+
+### Transition Properties
+
+**Basic Settings**
+- **Name** - Transition display name
+- **Model** - Which asset type this applies to
+- **Run Asynchronously** - Execute in background for long-running tasks
+- **Required Report** - Generate PDF report after completion
+
+**Status Control**
+- **Source** - Allowed statuses to run (e.g., only "new" assets)
+- **Target** - Status to set after completion
+
+**Actions**
+- **Action List** - Scripts and tasks to execute
+- **Order** - Sequence of execution
+
+**User Input**
+- **Fields** - Additional data to collect from user
+- **Validation** - Required fields and data types
+
+## Transition Actions
+
+Actions are tasks executed during transitions:
+
+### Built-in Actions
+
+Ralph includes several pre-built actions:
+
+**Change Rack**
+- Move asset to different rack position
+- Update DC visualization
+- Validate U-level availability
+
+**Assign User**
+- Assign asset to specific user
+- Update owner information
+- Send notification
+
+**Release from User**
+- Remove user assignment
+- Return to warehouse
+- Clear user-specific data
+
+**Assign Hostname**
+- Generate or assign hostname
+- Register in DNS
+- Configure network settings
+
+**Deploy**
+- Trigger deployment process
+- Execute provisioning scripts
+- Update configuration management
+
+### Custom Scripts
+
+Write Python scripts for custom automation:
+
+```python
+def execute_action(asset, **kwargs):
+    """Custom transition action"""
+    # Access asset properties
+    hostname = asset.hostname
+    
+    # Access user input from form
+    deployment_env = kwargs.get('environment')
+    
+    # Perform custom logic
+    configure_monitoring(hostname, deployment_env)
+    
+    # Update asset properties
+    asset.remarks = f"Deployed to {deployment_env}"
+    asset.save()
+```
+
+### HTTP Actions
+
+Call external APIs during transitions:
+
+```json
+{
+  "method": "POST",
+  "url": "https://monitoring.example.com/api/hosts",
+  "headers": {
+    "Authorization": "Bearer {{TOKEN}}"
+  },
+  "body": {
+    "hostname": "{{asset.hostname}}",
+    "service": "{{asset.service_env.service.name}}"
+  }
+}
+```
+
+<Note>
+HTTP actions support variable substitution using double curly braces. Access asset properties and user input values in your requests.
+</Note>
+
+## Transition Forms
+
+Collect additional information during transitions:
+
+### Form Fields
+
+Add input fields to gather data:
+
+**Field Types**
+- **String** - Text input
+- **Integer** - Numeric input
+- **Date** - Date picker
+- **Choice** - Dropdown selection
+- **Boolean** - Checkbox
+- **Foreign Key** - Select related object
+
+**Field Properties**
+- **Name** - Field identifier
+- **Label** - Display label
+- **Required** - Must be filled
+- **Default Value** - Pre-populated value
+- **Help Text** - User guidance
+
+### Example: Deployment Form
+
+```
+Fields:
+- IP Address (string, required)
+- Network (choice, required) 
+- Deploy Date (date, default: today)
+- Deployment Notes (string, optional)
+```
+
+When users run the transition, they fill out this form. Values are passed to action scripts as parameters.
+
+## Common Workflows
+
+### Server Deployment
+
+**Source Status:** New  
+**Target Status:** In Use
+
+**Actions:**
+1. Collect deployment parameters (IP, network, config)
+2. Generate hostname
+3. Assign IP address
+4. Update configuration management system
+5. Trigger PXE deployment
+6. Send notification to technical owner
+
+**Form Fields:**
+- Network environment (required)
+- IP address (optional, auto-assign if empty)
+- Configuration class (required)
+
+### Laptop Assignment
+
+**Source Status:** Free  
+**Target Status:** In Use
+
+**Actions:**
+1. Assign to user
+2. Set location
+3. Generate asset tag
+4. Send welcome email with asset details
+5. Create ticket for IT setup
+
+**Form Fields:**
+- User (required)
+- Office location (required)
+- Special requests (optional)
+
+### Asset Return
+
+**Source Status:** In Use  
+**Target Status:** Free
+
+**Actions:**
+1. Remove user assignment
+2. Clear configuration
+3. Mark for data wipe
+4. Move to warehouse
+5. Generate return receipt
+
+**Form Fields:**
+- Return reason (required)
+- Condition assessment (required)
+- Warranty status (choice)
+
+### Decommission
+
+**Source Status:** In Use  
+**Target Status:** Liquidated
+
+**Actions:**
+1. Remove from monitoring
+2. Remove from configuration management
+3. Clear IP assignments
+4. Remove from DC visualization
+5. Generate disposal certificate
+
+**Form Fields:**
+- Decommission reason (required)
+- Disposal method (choice: recycle, sell, destroy)
+- Data wipe confirmation (checkbox, required)
+
+## Integration Examples
+
+### Configuration Management
+
+Integrate with Puppet/Ansible:
+
+```python
+def configure_host(asset, **kwargs):
+    """Add host to configuration management"""
+    config_class = kwargs.get('configuration_class')
+    
+    # Update asset configuration path
+    asset.configuration_path = f"ralph/{config_class}"
+    asset.save()
+    
+    # Trigger Puppet/Ansible via API
+    cm_api.add_node(
+        hostname=asset.hostname,
+        classes=[config_class],
+        variables=asset.configuration_variables
+    )
+```
+
+### Monitoring Integration
+
+```python
+def add_to_monitoring(asset, **kwargs):
+    """Add to monitoring system"""
+    monitoring_api.create_host(
+        hostname=asset.hostname,
+        ip=asset.management_ip,
+        templates=get_templates_for_model(asset.model),
+        service=asset.service_env.service.name
+    )
+```
+
+### Ticketing System
+
+```python
+def create_deployment_ticket(asset, **kwargs):
+    """Create ticket for deployment task"""
+    ticket = jira_api.create_issue(
+        project='OPS',
+        issue_type='Task',
+        summary=f'Deploy {asset.hostname}',
+        description=f'Deploy asset {asset.barcode} to production',
+        assignee=asset.service_env.service.technical_owners[0]
+    )
+    
+    asset.task_url = ticket.url
+    asset.save()
+```
+
+## Reports and PDFs
+
+Generate reports during transitions:
+
+### Report Types
+
+- **Asset Labels** - Printable barcode labels
+- **Deployment Sheets** - Configuration details
+- **Return Receipts** - Asset return confirmation
+- **Disposal Certificates** - Decommission documentation
+- **Stock-Taking Reports** - Inventory confirmations
+
+### Configuration
+
+1. Create custom report template
+2. Link to transition in settings
+3. Select "Required report" option
+4. Report generates automatically after transition
+5. Download or email to stakeholders
+
+<Tip>
+Use report templates to generate consistent documentation for compliance and audit requirements.
+</Tip>
+
+## Permissions
+
+Control who can run transitions:
+
+- Assign transition permissions to user groups
+- Restrict sensitive transitions (liquidate, etc.)
+- Require approval workflows for high-value assets
+- Audit trail tracks who executed each transition
+
+## Best Practices
+
+<Tip>
+**Start Simple**: Begin with basic transitions (new → in use) before building complex multi-step workflows. Test thoroughly with sample assets.
+</Tip>
+
+<Tip>
+**Use Descriptive Names**: Name transitions clearly ("Deploy to Production", "Return from User") so users understand what each workflow does.
+</Tip>
+
+<Tip>
+**Require Key Information**: Use form fields to enforce data collection. If you need a decommission reason, make it required in the transition form.
+</Tip>
+
+<Note>
+Transitions can only change one status at a time. For complex workflows requiring multiple status changes, create separate transitions that can be run in sequence.
+</Note>
+
+<Tip>
+**Test with API Users**: When integrating with external systems, create dedicated API users with minimal permissions. This improves security and makes audit logs clearer.
+</Tip>
+
+## Troubleshooting
+
+**Transition Not Available**
+- Check asset current status matches transition source status
+- Verify user has permission to run this transition
+- Confirm transition is configured for this asset model type
+
+**Action Fails**
+- Check action script logs for error details
+- Verify external systems are accessible
+- Ensure required form fields were provided
+- Test action script independently
+
+**Bulk Transition Partially Fails**
+- Check individual asset statuses
+- Review error messages for each failure
+- Fix issues and re-run on failed assets only
+
+<Card title="Related Documentation" icon="book">
+  Learn more about [Asset Management](/features/asset-management) and [DCIM](/features/data-center)
+</Card>

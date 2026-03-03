@@ -1,0 +1,172 @@
+---
+title: Data Center Infrastructure Management (DCIM)
+description: Manage data center assets, racks, and infrastructure with Ralph's DCIM capabilities
+---
+
+Ralph's DCIM module helps you manage and track your data center infrastructure including servers, racks, network equipment, and their physical locations.
+
+## Overview
+
+The DCIM module allows you to:
+
+- Track data center assets with detailed specifications
+- Manage rack layouts and equipment placement
+- Organize assets by data center, server room, and rack
+- Configure configuration management paths for automation tools
+- Maintain asset relationships and dependencies
+
+## Managing Data Center Assets
+
+### Adding a New Asset
+
+<Steps>
+  <Step title="Navigate to Asset Creation">
+    Go to **Data Center → Hardware → Add data center asset**
+  </Step>
+  
+  <Step title="Fill Required Fields">
+    At minimum, you need to provide:
+    - **Model** - The hardware model (create new if needed)
+    - **Barcode** or **Serial Number** - Unique identifier
+    - **Service Environment** - The service and environment this asset belongs to
+  </Step>
+  
+  <Step title="Specify Location">
+    Define where the asset is located:
+    - **Rack** - The physical rack where it's installed
+    - **Position** - U-level position in the rack (use 0 for back-mounted equipment)
+    - **Slot** - For blade systems that occupy the same U position
+  </Step>
+  
+  <Step title="Save the Asset">
+    Click **Save** to create the asset. It will now appear in your data center visualization.
+  </Step>
+</Steps>
+
+### Asset Models
+
+Models help you organize devices of the same type. When creating a model:
+
+1. Click the **+** button in the Model field
+2. Enter the model name (e.g., "PowerEdge R620")
+3. Select a category from the tree menu
+4. Set **Type** to "data center" for DCIM use
+5. Optionally specify layout dimensions for visualization
+
+## Configuration Management Integration
+
+Ralph supports integration with configuration management tools like Puppet and Ansible through configuration paths.
+
+### Setting Up Configuration Modules
+
+<Steps>
+  <Step title="Create Configuration Module">
+    Navigate to `/assets/configurationmodule/` and create a new module.
+    
+    Configuration modules can be organized in a tree structure to reflect your directory layout.
+  </Step>
+  
+  <Step title="Add Configuration Classes">
+    Go to `/assets/configurationclass/` to add classes that will mark hosts with specific configurations.
+    
+    - For **Puppet**: These map directly to Puppet classes
+    - For **Ansible**: These can be mapped to Playbooks
+  </Step>
+  
+  <Step title="Assign to Assets">
+    On your Data Center Asset, use the **configuration path** field to attach the configuration.
+  </Step>
+</Steps>
+
+### Using Configuration Variables
+
+Custom fields can be exposed as configuration variables:
+
+1. Create a custom field (see [Custom Fields](/user-guide/custom-fields))
+2. Enable **"use as configuration variable"** in its settings
+3. The field will appear under `configuration_variables` in the REST API
+
+Example API response:
+```json
+{
+  "configuration_path": "ralph/www",
+  "configuration_variables": {
+    "monitoring": "zabbix",
+    "environment": "production"
+  }
+}
+```
+
+## Asset Organization
+
+### Service Environments
+
+Service Environments group assets by their purpose and deployment stage:
+
+- **Service** - The business purpose (e.g., "Load Balancing", "Database Cluster")
+- **Environment** - Deployment stage (e.g., "production", "testing", "development")
+
+This information is critical for:
+- Patch management decisions
+- Deployment automation
+- Upgrade planning
+- Change management
+
+### Physical Location Hierarchy
+
+```
+Data Center
+└── Server Room
+    └── Rack
+        └── Asset (at specific U position)
+```
+
+## Asset Relationships
+
+Use the **parent** field to establish asset hierarchies:
+
+- Blade server → Blade chassis
+- Virtual machine → Hypervisor
+- OpenStack VM → OpenStack tenant
+
+## Rack Accessories
+
+Ralph tracks various rack-mounted accessories:
+
+- Brush panels
+- Fiber channel patch panels
+- UTP patch panels
+- Cable organizers
+- Power sockets
+
+## REST API Integration
+
+Fetch configuration data programmatically:
+
+```bash
+# Get asset with configuration
+curl https://<YOUR-RALPH-URL>/api/data-center-assets/1234/ \
+  -H "Authorization: Token YOUR_API_TOKEN"
+```
+
+The response includes `configuration_path` and `configuration_variables` fields for automation.
+
+## Tips and Best Practices
+
+<Tip>
+  **Configuration Module Hierarchy**: Use parent-child relationships in configuration modules to mirror your actual file/directory structure in Puppet or Ansible.
+</Tip>
+
+<Tip>
+  **Position Zero**: Use position `0` for equipment mounted on the back of racks, like power supplies or cable management.
+</Tip>
+
+<Tip>
+  **Blade Systems**: For blade chassis, set the number of slots in the Model configuration under "layout of front/back size" fields.
+</Tip>
+
+## Related Documentation
+
+- [DC Visualization](/user-guide/dc-visualization) - Visual rack management
+- [Custom Fields](/user-guide/custom-fields) - Extend asset data
+- [Deployment](/user-guide/deployment) - Automated server deployment

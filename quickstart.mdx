@@ -1,80 +1,629 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quick Start Guide'
+description: 'Get started with Ralph in minutes - install, configure, and add your first assets'
 ---
 
-## Get started in three steps
+## What You'll Learn
 
-Get your documentation site running locally and make your first customization.
+This guide walks you through:
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+1. Installing Ralph using Docker (fastest method)
+2. Initial configuration and login
+3. Adding your first data center asset
+4. Exploring the DC visualization
+5. Managing licenses and support contracts
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  This tutorial takes approximately 20 minutes to complete. By the end, you'll have a working Ralph instance with sample data.
 </Note>
+
+## Installation
+
+### Docker Installation (Recommended)
+
+The fastest way to get Ralph running is using Docker Compose.
+
+<Steps>
+  <Step title="Install Docker & Docker Compose">
+    Ensure you have Docker and Docker Compose installed on your system.
+    
+    ```bash
+    docker --version
+    docker-compose --version
+    ```
+  </Step>
+
+  <Step title="Clone the Repository">
+    ```bash
+    git clone https://github.com/allegro/ralph.git
+    cd ralph/contrib
+    ```
+  </Step>
+
+  <Step title="Create Docker Compose Configuration">
+    Copy the template configuration:
+    
+    ```bash
+    cp docker-compose.yml.tmpl docker-compose.yml
+    ```
+    
+    Edit `docker-compose.yml` to customize settings if needed.
+  </Step>
+
+  <Step title="Build Ralph">
+    ```bash
+    docker-compose build
+    ```
+  </Step>
+
+  <Step title="Initialize the Database">
+    Run this command only once to set up the database schema:
+    
+    ```bash
+    docker-compose run --rm web /root/init.sh
+    ```
+  </Step>
+
+  <Step title="Load Demo Data (Optional)">
+    Populate Ralph with demonstration data to explore features:
+    
+    ```bash
+    docker-compose run --rm web ralph demodata
+    ```
+  </Step>
+
+  <Step title="Start Ralph">
+    ```bash
+    docker-compose up -d
+    ```
+    
+    Ralph will be accessible at `http://127.0.0.1`
+  </Step>
+</Steps>
+
+<Warning>
+  The `init.sh` script should only be executed once during initial setup. Running it again will reset your database.
+</Warning>
+
+### Ubuntu Installation (Production)
+
+For production deployments on Ubuntu 18.04 or newer:
+
+<Steps>
+  <Step title="Add Ralph Repository">
+    ```bash
+    curl -sL https://packagecloud.io/allegro/ralph/gpgkey | sudo apt-key add -
+    sudo sh -c "echo 'deb https://packagecloud.io/allegro/ralph/ubuntu/ bionic main' > /etc/apt/sources.list.d/ralph.list"
+    sudo apt-get update
+    ```
+  </Step>
+
+  <Step title="Install Ralph">
+    ```bash
+    sudo apt-get install mysql-server nginx ralph-core
+    ```
+    
+    When prompted, configure database settings. Default settings work for testing.
+  </Step>
+
+  <Step title="Create Database">
+    ```bash
+    sudo mysql
+    ```
+    
+    ```sql
+    CREATE USER 'ralph_ng'@'127.0.0.1' IDENTIFIED BY 'ralph_ng';
+    GRANT ALL PRIVILEGES ON ralph_ng.* TO 'ralph_ng'@'127.0.0.1';
+    CREATE DATABASE ralph_ng;
+    EXIT;
+    ```
+  </Step>
+
+  <Step title="Initialize Ralph">
+    ```bash
+    sudo ralphctl migrate
+    sudo ralphctl createsuperuser
+    sudo ralphctl demodata  # Optional: load sample data
+    ```
+  </Step>
+
+  <Step title="Configure Nginx">
+    Edit `/etc/nginx/sites-available/default` with the following configuration:
+    
+    ```nginx
+    server {
+        listen 80;
+        client_max_body_size 512M;
+        
+        proxy_set_header Connection "";
+        proxy_http_version 1.1;
+        proxy_connect_timeout 300;
+        proxy_read_timeout 300;
+        
+        location /static {
+            alias /usr/share/ralph/static;
+            expires 1M;
+        }
+        
+        location / {
+            proxy_pass http://127.0.0.1:8000;
+            include /etc/nginx/uwsgi_params;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+    }
+    ```
+    
+    Restart Nginx:
+    ```bash
+    sudo systemctl restart nginx.service
+    ```
+  </Step>
+
+  <Step title="Start Ralph">
+    ```bash
+    sudo ralphctl sitetree_resync_apps
+    sudo systemctl enable ralph.service
+    sudo systemctl start ralph.service
+    ```
+    
+    Access Ralph at `http://localhost`
+  </Step>
+</Steps>
+
+## First Login
+
+After installation:
+
+1. Navigate to your Ralph instance (e.g., `http://localhost`)
+2. Log in with the superuser credentials you created
+3. You'll see the Ralph dashboard
+
+<Note>
+  If you loaded demo data, you'll see sample assets, services, and other resources already populated.
+</Note>
+
+## Adding Your First Data Center Asset
+
+Let's add a blade server that will serve as a load balancer.
+
+### Step 1: Create a Model
+
+Before adding an asset, we need to define its model.
+
+<Steps>
+  <Step title="Navigate to Add Asset">
+    Go to **Data Center → Hardware → Add data center asset**
+  </Step>
+
+  <Step title="Create Model">
+    Click the **+** button next to the Model field.
+    
+    Fill in the model details:
+    - **Name**: "Dell PowerEdge R620"
+    - **Category**: Select from the tree menu (e.g., Server → Rack)
+    - **Type**: Choose "data center"
+    - **Height (U)**: 2
+    
+    Click **Save**
+  </Step>
+</Steps>
+
+<Note>
+  The **Type** field determines where the asset appears. "data center" assets show in DC modules, while "back office" assets appear in Back Office modules.
+</Note>
+
+### Step 2: Create Service Environment
+
+Service Environments group assets by their business purpose and deployment stage.
+
+<Steps>
+  <Step title="Open Service Environment Selector">
+    Click the magnifying glass icon next to the **Service Environment** field, then click **Add Service Env**.
+  </Step>
+
+  <Step title="Create a Service">
+    Click the **+** button next to Service.
+    
+    Configure the service:
+    - **Name**: "Load Balancing"
+    - **Active**: ✓ (checked)
+    - **Business Owners**: (optional) Select responsible users
+    - **Technical Owners**: (optional) Select technical team leads
+    
+    Click **Save**
+  </Step>
+
+  <Step title="Create Environments">
+    Below the Service field, add environments:
+    - "production"
+    - "testing"
+    - "development"
+    
+    Select **production** for this asset.
+  </Step>
+
+  <Step title="Save Service Environment">
+    Click **Save** to create the Service Environment.
+  </Step>
+</Steps>
+
+The Service Environment model in Ralph:
+
+```python
+class ServiceEnvironment(BaseObject):
+    service = models.ForeignKey(Service, on_delete=models.CASCADE)
+    environment = models.ForeignKey(Environment, on_delete=models.CASCADE)
+    
+    def __str__(self):
+        return "{} - {}".format(
+            self.service.name, 
+            self.environment.name
+        )
+```
+
+### Step 3: Specify Location
+
+To visualize assets in the DC view, configure their physical location.
+
+<Steps>
+  <Step title="Create a Rack">
+    Click **+** next to the Rack field.
+    
+    - **Name**: "Rack-A1"
+    - Click **+** to create a Server Room: "DC1-MainRoom"
+    - **Orientation**: Front
+    - Leave grid position as default for now
+    
+    Click **Save**
+  </Step>
+
+  <Step title="Set U Position">
+    In the **Position** field, enter the U-level where the server is installed.
+    
+    - **Position**: 6 (installs at U6 in the rack)
+    - **Orientation**: Front
+  </Step>
+</Steps>
+
+<Note>
+  **Position 0** is reserved for accessories like PDUs or patch panels mounted on the back of the rack.
+  
+  The **Slot** field is used for blade chassis that contain multiple servers in a single U position.
+</Note>
+
+### Step 4: Complete the Asset
+
+<Steps>
+  <Step title="Fill Required Fields">
+    Complete the remaining required fields:
+    
+    - **Barcode**: "BC123456" (or scan actual barcode)
+    - **Serial Number**: "SN789012" (optional if barcode is provided)
+    - **Service Environment**: Select the "Load Balancing - production" you created
+  </Step>
+
+  <Step title="Add Optional Details">
+    Consider filling optional fields:
+    
+    - **Hostname**: "lb-prod-01.datacenter.local"
+    - **Remarks**: "Primary load balancer for web tier"
+    - **Invoice Date**: Purchase date
+    - **Price**: Asset purchase price
+  </Step>
+
+  <Step title="Save the Asset">
+    Click **Save** to create your first data center asset!
+  </Step>
+</Steps>
+
+Congratulations! You've successfully:
+- ✓ Created a reusable asset model
+- ✓ Set up a service and environment structure
+- ✓ Configured a data center location (room and rack)
+- ✓ Added your first asset to Ralph
+
+## Exploring DC Visualization
+
+Ralph's DC visualization provides an interactive view of your data center infrastructure.
+
+### Viewing Your Data Center
+
+<Steps>
+  <Step title="Open DC Visualization">
+    Navigate to **Data Center → Visualization** in the menu.
+  </Step>
+
+  <Step title="Find Your Rack">
+    You should see your newly created rack displayed on the grid. The visualization shows:
+    
+    - Rack position in the room
+    - Rack orientation (which direction it faces)
+    - Rack name
+  </Step>
+
+  <Step title="Enter Edit Mode">
+    Click the **Edit** button to:
+    
+    - **Drag racks** to new positions
+    - **Rotate racks** using the rotation button
+    - **Rename racks** by clicking the pencil icon
+    - **Add new racks** by clicking the grid with the plus cursor
+  </Step>
+
+  <Step title="Adjust Grid Size">
+    Extend the data center floor plan by changing the grid dimensions:
+    
+    - Edit **Columns** and **Rows** in the Data Center settings
+    - This allows you to accommodate more racks
+  </Step>
+</Steps>
+
+### Inspecting Rack Contents
+
+<Steps>
+  <Step title="Click on Your Rack">
+    Click on Rack-A1 to open the Rack Inspector.
+  </Step>
+
+  <Step title="View Front and Back">
+    The inspector displays both sides of the rack:
+    
+    - **Front view**: Shows servers and equipment with front orientation
+    - **Back view**: Shows equipment mounted on the rear, power distribution units
+    - **U positions**: Numbered from bottom to top
+  </Step>
+
+  <Step title="See Your Asset">
+    Your Dell PowerEdge R620 should be visible at U6, occupying 2U of space.
+    
+    Click on the asset to:
+    - View quick details
+    - Access the edit form
+    - See related information (licenses, supports, network)
+  </Step>
+</Steps>
+
+<Note>
+  The DC visualization updates in real-time. Any changes to rack assignments or positions immediately reflect in the view.
+</Note>
+
+## Managing Software Licenses
+
+Track software licenses and their assignments to ensure compliance.
+
+### Creating a License
+
+<Steps>
+  <Step title="Navigate to Licenses">
+    Go to **Licenses → Licenses → Add License**
+  </Step>
+
+  <Step title="Create Software Entry">
+    Click **+** next to Software field:
+    
+    - **Name**: "Microsoft Office 2019"
+    - **Asset Type**: Select "All" (available for both DC and Back Office)
+    
+    Click **Save**
+  </Step>
+
+  <Step title="Configure License Details">
+    Fill in the license information:
+    
+    - **License Type**: "per user"
+    - **Software**: "Microsoft Office 2019"
+    - **Inventory Number**: Your internal tracking number
+    - **Region**: Select your region (e.g., "Default")
+    - **Serial Number**: The license key
+    - **Number of Purchased Items**: 10
+    - **Invoice Date**: Purchase date
+    - **Price**: Total cost for all licenses
+  </Step>
+
+  <Step title="Save the License">
+    Click **Save** to create the license.
+  </Step>
+</Steps>
+
+Example license model structure:
+
+```python
+from ralph.licences.models import Licence, Software
+
+# Software represents the product
+software = Software.objects.create(
+    name="Microsoft Office 2019",
+    asset_type="all"  # Available for all asset types
+)
+
+# Licence tracks the purchased licenses
+licence = Licence.objects.create(
+    software=software,
+    licence_type="per_user",
+    number_bought=10,
+    sn="XXXXX-XXXXX-XXXXX-XXXXX"
+)
+```
+
+### Assigning Licenses
+
+<Steps>
+  <Step title="Open License Assignments">
+    In your license detail view, click the **Assignments** tab.
+  </Step>
+
+  <Step title="Add Asset Assignment">
+    For hardware-based licenses:
+    
+    - Search for your asset using barcode ("BC123456")
+    - Or use the magnifying glass to browse assets
+    - Specify quantity if assigning multiple licenses
+  </Step>
+
+  <Step title="Add User Assignment">
+    For per-user licenses:
+    
+    - Click the **Assigned to Users** tab
+    - Select users from your directory
+    - Each assignment decrements available licenses
+  </Step>
+
+  <Step title="Monitor Availability">
+    Ralph automatically calculates free licenses:
+    
+    - **Total**: 10
+    - **Used**: 3
+    - **Free**: 7
+    
+    The system prevents over-allocation.
+  </Step>
+</Steps>
+
+<Warning>
+  When you reach 0 free licenses, Ralph will prevent additional assignments until you purchase more licenses or deallocate existing ones.
+</Warning>
+
+### License Reports
+
+Generate compliance and usage reports:
+
+1. Navigate to **Reports → Licenses**
+2. Select report type:
+   - License usage summary
+   - Expiring licenses
+   - Over-allocated licenses
+   - Cost analysis by department
+3. Export to PDF or CSV
+
+## Vendor Support Contracts
+
+Track vendor support agreements, SLAs, and maintenance contracts.
+
+### Adding Support Contracts
+
+<Steps>
+  <Step title="Navigate to Supports">
+    Go to **Supports → Supports → Add Support**
+  </Step>
+
+  <Step title="Create Support Entry">
+    Configure the support contract:
+    
+    - **Name**: "Dell ProSupport Plus"
+    - **Contract ID**: Vendor's contract number
+    - **Asset**: Select your server (search by barcode)
+    - **Support Type**: "Vendor support" or "Warranty"
+    - **Status**: "Active"
+    - **Date From**: Contract start date
+    - **Date To**: Contract end date
+    - **Price**: Annual cost
+  </Step>
+
+  <Step title="Add Documentation">
+    Attach contract documents:
+    
+    - Click **Attachments** tab
+    - Upload PDF copies of support agreements
+    - Add notes or special terms
+  </Step>
+
+  <Step title="Save Support Contract">
+    Click **Save** to create the support record.
+  </Step>
+</Steps>
+
+<Note>
+  Ralph can send notifications when support contracts are approaching expiration, helping you plan renewals in advance.
+</Note>
+
+### Key Differences from Licenses
+
+- **Asset-only**: Supports attach to assets, not users
+- **Status tracking**: Mark contracts as Active, Expired, or Cancelled
+- **SLA terms**: Store response time and resolution commitments
+- **Renewal tracking**: Monitor expiration dates
+
+## Next Steps
+
+You now have a working Ralph instance with:
+
+- ✓ Data center assets with location tracking
+- ✓ Service and environment organization
+- ✓ Software license management
+- ✓ Vendor support tracking
+
+### Continue Your Journey
+
+<CardGroup cols={2}>
+  <Card title="Back Office Assets" icon="briefcase" href="/back-office/overview">
+    Learn to manage laptops, desktops, and mobile devices
+  </Card>
+  <Card title="Network Management" icon="network-wired" href="/network/overview">
+    Configure IP addresses, DHCP, and DNS integration
+  </Card>
+  <Card title="Workflow System" icon="diagram-project" href="/workflows/transitions">
+    Create custom transitions for asset lifecycle automation
+  </Card>
+  <Card title="API Integration" icon="plug" href="/api/getting-started">
+    Integrate Ralph with your existing tools via REST API
+  </Card>
+  <Card title="Custom Fields" icon="sliders" href="/configuration/custom-fields">
+    Extend Ralph's data model for your specific needs
+  </Card>
+  <Card title="Reports" icon="chart-line" href="/reports/overview">
+    Generate compliance and asset utilization reports
+  </Card>
+</CardGroup>
+
+### Get Help
+
+<CardGroup cols={2}>
+  <Card title="Community Forum" icon="comments" href="https://ralph.discourse.group">
+    Ask questions and share knowledge with the Ralph community
+  </Card>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/allegro/ralph/issues">
+    Report bugs or request features
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Common Issues
+
+**Ralph won't start**
+
+Check log files:
+```bash
+# Docker installation
+docker-compose logs web
+
+# Ubuntu installation
+tail -f /var/log/ralph/ralph.log
+tail -f /var/log/ralph/gunicorn.error.log
+```
+
+**Database connection errors**
+
+Verify database credentials in:
+- Docker: `docker-compose.yml`
+- Ubuntu: `/etc/ralph/conf.d/database.conf`
+
+**Can't access on port 80**
+
+Ensure no other service is using port 80:
+```bash
+sudo netstat -tulpn | grep :80
+```
+
+**Static files not loading**
+
+For Ubuntu installations:
+```bash
+sudo ralphctl collectstatic
+sudo systemctl restart ralph.service
+```
+
+<Warning>
+  For production deployments, review the security checklist in the Configuration guide and configure HTTPS, change default passwords, and set up proper firewall rules.
+</Warning>

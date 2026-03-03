@@ -1,0 +1,95 @@
+---
+title: Installation Overview
+description: Choose the right installation method for Ralph based on your environment and requirements
+---
+
+Ralph is a full-featured Asset Management, DCIM and CMDB system for data centers and back offices. This guide will help you choose the right installation method for your needs.
+
+## Installation Methods
+
+Ralph offers multiple installation approaches depending on your environment and requirements:
+
+### Ubuntu Package (Recommended)
+
+The most stable and production-ready installation method. Ralph provides official Debian packages for Ubuntu 18.04 Bionic and newer versions.
+
+**Best for:**
+- Production deployments
+- Traditional server environments
+- Organizations requiring system-level service management
+
+**Key features:**
+- Python 3.10+ support
+- Systemd service integration
+- Managed configuration via `/etc/ralph`
+- CLI management tool (`ralphctl`)
+
+[Learn more about Ubuntu installation →](/installation/ubuntu)
+
+### Docker Installation
+
+Quick deployment using Docker containers with pre-configured services including web server, database, Redis, and nginx.
+
+**Best for:**
+- Quick evaluation and demos
+- Development environments
+- Container-based infrastructure
+- Isolated deployments
+
+**Key features:**
+- Pre-built images (`allegro/ralph` and `allegro/ralph-static-nginx`)
+- Docker Compose orchestration
+- Minimal configuration required
+- Easy scaling and updates
+
+[Learn more about Docker installation →](/installation/docker)
+
+## Prerequisites
+
+Before installing Ralph, ensure you have:
+
+### System Requirements
+
+- **Operating System**: Ubuntu 18.04+ (for package installation) or any OS with Docker support
+- **Python**: 3.10 or 3.11 (for Ubuntu installation)
+- **Database**: MySQL 5.7+ or PostgreSQL
+- **Memory**: Minimum 2GB RAM (4GB+ recommended for production)
+- **Disk Space**: Minimum 10GB
+
+### Required Services
+
+- **Database Server**: MySQL 5.7+ or PostgreSQL for data storage
+- **Redis**: For caching and background task queue
+- **Web Server**: Nginx (for production deployments)
+
+## What's Next?
+
+After installation, you'll need to:
+
+1. **Configure Ralph** - Set up database connections, Redis, and other settings
+2. **Initialize the Database** - Run migrations and create the schema
+3. **Create Admin User** - Set up your first superuser account
+4. **Configure Services** - Set up systemd services or Docker containers
+
+<CardGroup cols={2}>
+  <Card title="Ubuntu Installation" icon="ubuntu" href="/installation/ubuntu">
+    Install Ralph using Debian packages on Ubuntu
+  </Card>
+  <Card title="Docker Installation" icon="docker" href="/installation/docker">
+    Deploy Ralph using Docker containers
+  </Card>
+  <Card title="Configuration" icon="gear" href="/installation/configuration">
+    Configure Ralph for your environment
+  </Card>
+  <Card title="Data Migration" icon="database" href="/installation/migration">
+    Migrate data from Ralph 2 or other sources
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+If you encounter issues during installation:
+
+- Visit the [Ralph Community Forum](https://ralph.discourse.group)
+- Check the [GitHub Issues](https://github.com/allegro/ralph/issues)
+- Review the troubleshooting section in each installation guide

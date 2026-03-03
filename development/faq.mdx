@@ -1,0 +1,573 @@
+---
+title: Developer FAQ
+description: Frequently asked questions for Ralph developers, covering common issues, best practices, and troubleshooting tips.
+---
+
+Common questions and solutions for Ralph developers.
+
+## Admin and Views
+
+<AccordionGroup>
+  <Accordion title="Why do I get 'ImproperlyConfigured' error after attaching an extra view to admin class?">
+    Single extra view classes **cannot** be reused across multiple admin sites. Each admin site requires its own instance of the extra view class.
+
+    **Problem:**
+    ```python
+    class MyView(RalphDetailViewAdmin):
+        icon = 'chain'
+        label = 'My View'
+        url_name = 'my-view'
+    
+    @register(MyModel)
+    class MyAdmin(RalphAdmin):
+        change_views = [MyView]
+    
+    @register(MyModel2)
+    class MyAdmin2(RalphAdmin):
+        change_views = [MyView]  # Error: Reusing MyView!
+    ```
+
+    **Solution:**
+    Create a separate class for each admin site, even if they inherit from the same base:
+
+    ```python
+    class MyView(RalphDetailViewAdmin):
+        icon = 'chain'
+        label = 'My View'
+        url_name = 'my-view'
+        # ... view implementation ...
+    
+    class MyView2(MyView):
+        pass  # Inherits everything from MyView
+    
+    @register(MyModel)
+    class MyAdmin(RalphAdmin):
+        change_views = [MyView]
+    
+    @register(MyModel2)
+    class MyAdmin2(RalphAdmin):
+        change_views = [MyView2]  # Separate instance
+    ```
+
+    **Real-world example:**
+    The Attachments app demonstrates this pattern. For every admin site using `AttachmentsMixin`, a separate `AttachmentsView` class is created.
+
+    See `ralph/attachments/admin.py` for implementation examples.
+  </Accordion>
+
+  <Accordion title="How do I see asset boxes in front dashboard?">
+    By default, the front dashboard doesn't show "Hardware loan", "Hardware release", or "Hardware return" boxes. These boxes appear only when you have assigned assets in specific states.
+
+    **Requirements:**
+    - Asset must be in 'in progress' or 'in use' state
+    - Asset must be assigned to the current user
+    - Transition IDs must be configured in settings
+
+    **Setup steps for empty database:**
+
+    1. **Create the database and superuser:**
+       ```bash
+       dev_ralph migrate
+       make menu
+       dev_ralph createsuperuser --email='admin@example.com' --username=root
+       dev_ralph createsuperuser --email='user@example.com' --username=r2
+       ```
+
+    2. **Create a transition:**
+       - Navigate to: `http://localhost:8000/transitions/transitionmodel/1/`
+       - Click **[add another transition]**
+       - Set:
+         - Source: 'in progress'
+         - Destination: 'in use'
+       - Click **[Save]**
+
+    3. **Find the transition ID:**
+       ```bash
+       dev_ralph dbshell
+       ```
+       ```sql
+       SELECT * FROM transitions_transition;
+       ```
+       Note the `id` value (e.g., `1`)
+
+    4. **Configure settings:**
+       Add to `settings/dev.py`:
+       ```python
+       ACCEPT_ASSETS_FOR_CURRENT_USER_CONFIG['RETURN_TRANSITION_ID'] = 1
+       ACCEPT_ASSETS_FOR_CURRENT_USER_CONFIG['LOAN_TRANSITION_ID'] = 1
+       ACCEPT_ASSETS_FOR_CURRENT_USER_CONFIG['TRANSITION_ID'] = 1
+       ```
+       Replace `1` with your actual transition ID.
+
+    5. **Create test assets:**
+       Navigate to `http://localhost:8000/back_office/backofficeasset/add/` and create assets with:
+       - Status: 'in progress'
+       - Assigned to user: r2
+       - Owner: r2
+       
+       Repeat with statuses 'return in progress' and 'loan in progress'.
+
+    6. **View dashboard:**
+       Open incognito mode and login as user `r2` to see the dashboard boxes.
+  </Accordion>
+
+  <Accordion title="Why do I get 'NoReverseMatch' error for transition_bulk?">
+    This error occurs when transition IDs are not properly configured:
+
+    ```
+    NoReverseMatch at /
+    Reverse for 'back_office_backofficeasset_transition_bulk' with arguments '(None,)' and keyword arguments '{}' not found.
+    ```
+
+    **Solution:**
+    Configure the transition IDs in your settings file as shown in the previous FAQ item.
+  </Accordion>
+</AccordionGroup>
+
+## API Development
+
+<AccordionGroup>
+  <Accordion title="How do I create a new API endpoint?">
+    Create API endpoints using Ralph's base classes:
+
+    ```python
+    from ralph.api import RalphAPISerializer, RalphAPIViewSet, router
+    
+    class MyModelSerializer(RalphAPISerializer):
+        class Meta:
+            model = MyModel
+            fields = '__all__'  # or specify fields explicitly
+    
+    class MyModelViewSet(RalphAPIViewSet):
+        queryset = MyModel.objects.all()
+        serializer_class = MyModelSerializer
+        filterset_fields = ['name', 'status']
+    
+    router.register(r'my-models', MyModelViewSet)
+    ```
+
+    The endpoint will be available at `/api/my-models/`.
+
+    See [API Documentation](/development/api) for advanced features.
+  </Accordion>
+
+  <Accordion title="How do I optimize API queries to avoid N+1 problems?">
+    Use `select_related` and `prefetch_related` in your ViewSet:
+
+    ```python
+    class MyModelViewSet(RalphAPIViewSet):
+        queryset = MyModel.objects.all()
+        serializer_class = MyModelSerializer
+        
+        # Use select_related for ForeignKey and OneToOne
+        select_related = [
+            'owner',
+            'category',
+            'service_env__service',
+        ]
+        
+        # Use prefetch_related for ManyToMany and reverse ForeignKey
+        prefetch_related = [
+            'tags',
+            'licences',
+            'ethernet_set',
+        ]
+    ```
+
+    **Tip:** Check the Django Debug Toolbar or use `django.db.connection.queries` to identify N+1 queries.
+  </Accordion>
+
+  <Accordion title="How do I add custom filtering to an API endpoint?">
+    Ralph provides multiple filtering options:
+
+    **1. Simple field filtering:**
+    ```python
+    class MyModelViewSet(RalphAPIViewSet):
+        filterset_fields = ['name', 'status', 'created_date']
+    ```
+    Usage: `/api/my-models/?name=test&status=active`
+
+    **2. Lookup filtering (automatic):**
+    Usage: `/api/my-models/?name__startswith=test&created_date__gte=2024-01-01`
+
+    **3. Extended filters for polymorphic models:**
+    ```python
+    class MyModelViewSet(RalphAPIViewSet):
+        extended_filter_fields = {
+            'name': ['asset__hostname', 'virtual__name', 'cloud__hostname']
+        }
+    ```
+    Usage: `/api/my-models/?name=test` searches all specified fields
+
+    **4. Custom filter backend:**
+    ```python
+    from django_filters import rest_framework as filters
+    
+    class MyModelFilter(filters.FilterSet):
+        min_price = filters.NumberFilter(field_name='price', lookup_expr='gte')
+        max_price = filters.NumberFilter(field_name='price', lookup_expr='lte')
+        
+        class Meta:
+            model = MyModel
+            fields = ['name', 'status']
+    
+    class MyModelViewSet(RalphAPIViewSet):
+        filterset_class = MyModelFilter
+    ```
+  </Accordion>
+
+  <Accordion title="How do I implement separate serializers for read and write operations?">
+    Use the `save_serializer_class` attribute:
+
+    ```python
+    class MyModelSerializer(RalphAPISerializer):
+        # Read serializer with nested objects
+        owner = UserSerializer()
+        category = CategorySerializer()
+        
+        class Meta:
+            model = MyModel
+            fields = '__all__'
+    
+    class MyModelSaveSerializer(RalphAPISaveSerializer):
+        # Write serializer with IDs only
+        class Meta:
+            model = MyModel
+            fields = '__all__'
+    
+    class MyModelViewSet(RalphAPIViewSet):
+        serializer_class = MyModelSerializer
+        save_serializer_class = MyModelSaveSerializer
+    ```
+
+    Now:
+    - GET requests return nested objects
+    - POST/PUT/PATCH requests accept IDs
+  </Accordion>
+</AccordionGroup>
+
+## Models and Database
+
+<AccordionGroup>
+  <Accordion title="How do I add custom validation to a model?">
+    Override the `clean()` method:
+
+    ```python
+    from django.core.exceptions import ValidationError
+    from django.db import models
+    
+    class MyModel(models.Model):
+        start_date = models.DateField()
+        end_date = models.DateField()
+        
+        def clean(self):
+            super().clean()
+            if self.end_date and self.start_date > self.end_date:
+                raise ValidationError({
+                    'end_date': 'End date must be after start date'
+                })
+    ```
+
+    This validation will run:
+    - In Django admin forms
+    - In API requests (if using `RalphAPISerializer`)
+    - When calling `full_clean()` or `save()` with validation
+  </Accordion>
+
+  <Accordion title="How do I create database migrations?">
+    After modifying models:
+
+    ```bash
+    # Create migration
+    dev_ralph makemigrations
+    
+    # Review the migration file
+    cat src/ralph/myapp/migrations/0XXX_auto_YYYYMMDD_HHMM.py
+    
+    # Apply migration
+    dev_ralph migrate
+    
+    # Check migration status
+    dev_ralph showmigrations
+    ```
+
+    **Best practices:**
+    - Review generated migrations before committing
+    - Add data migrations for complex changes
+    - Test migrations on a copy of production data
+    - Never modify applied migrations
+  </Accordion>
+
+  <Accordion title="How do I use custom fields?">
+    Ralph supports custom fields through the Custom Fields framework:
+
+    1. **Enable custom fields in admin:**
+       ```python
+       from ralph.lib.custom_fields.admin import CustomFieldsAdminMixin
+       
+       @register(MyModel)
+       class MyAdmin(CustomFieldsAdminMixin, RalphAdmin):
+           pass
+       ```
+
+    2. **Custom fields are automatically available in API**
+
+    3. **Access in code:**
+       ```python
+       obj = MyModel.objects.get(id=1)
+       value = obj.custom_fields.get('my_custom_field')
+       obj.custom_fields['my_custom_field'] = 'new value'
+       obj.save()
+       ```
+
+    See [Custom Fields Documentation](/development/custom-fields) for details.
+  </Accordion>
+</AccordionGroup>
+
+## Testing
+
+<AccordionGroup>
+  <Accordion title="How do I run tests?">
+    ```bash
+    # Run all tests
+    make test
+    
+    # Run tests for specific app
+    make test TEST=ralph.assets
+    
+    # Run specific test class
+    test_ralph test ralph.assets.tests.test_models.AssetTest
+    
+    # Run specific test method
+    test_ralph test ralph.assets.tests.test_models.AssetTest.test_create_asset
+    
+    # Run with coverage
+    make coverage
+    
+    # Keep database between test runs (faster)
+    test_ralph test ralph.assets --keepdb
+    ```
+  </Accordion>
+
+  <Accordion title="How do I write API tests?">
+    Use Ralph's test utilities:
+
+    ```python
+    from ralph.api.tests import RalphAPITestCase
+    from ralph.myapp.models import MyModel
+    
+    class MyModelAPITest(RalphAPITestCase):
+        def setUp(self):
+            super().setUp()
+            self.obj = MyModel.objects.create(name='Test')
+        
+        def test_list_endpoint(self):
+            url = reverse('mymodel-list')
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(len(response.data['results']), 1)
+        
+        def test_create_endpoint(self):
+            url = reverse('mymodel-list')
+            data = {'name': 'New Object'}
+            response = self.client.post(url, data, format='json')
+            self.assertEqual(response.status_code, 201)
+            self.assertEqual(MyModel.objects.count(), 2)
+    ```
+  </Accordion>
+
+  <Accordion title="How do I use factories for test data?">
+    Ralph uses factory_boy for test data:
+
+    ```python
+    import factory
+    from factory.django import DjangoModelFactory
+    
+    class MyModelFactory(DjangoModelFactory):
+        name = factory.Sequence(lambda n: f'Object {n}')
+        status = 'active'
+        created_date = factory.Faker('date_this_year')
+        
+        class Meta:
+            model = MyModel
+    
+    # Use in tests
+    class MyTest(TestCase):
+        def test_something(self):
+            obj = MyModelFactory()
+            objects = MyModelFactory.create_batch(5)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Deployment and Configuration
+
+<AccordionGroup>
+  <Accordion title="How do I configure Ralph settings?">
+    Ralph uses Django's settings system with environment-specific files:
+
+    - `settings/base.py` - Base settings
+    - `settings/dev.py` - Development overrides
+    - `settings/prod.py` - Production overrides
+    - `settings/test.py` - Test overrides
+
+    **Override settings:**
+    Create `settings/local.py`:
+    ```python
+    from ralph.settings.dev import *
+    
+    DATABASES['default']['HOST'] = 'localhost'
+    DEBUG = True
+    ALLOWED_HOSTS = ['*']
+    ```
+
+    **Use environment variables:**
+    ```python
+    import os
+    
+    SECRET_KEY = os.environ.get('RALPH_SECRET_KEY', 'dev-secret-key')
+    DATABASE_URL = os.environ.get('DATABASE_URL', 'mysql://...')
+    ```
+  </Accordion>
+
+  <Accordion title="How do I enable debug mode safely?">
+    **Never enable DEBUG in production!**
+
+    For development:
+    ```python
+    # settings/local.py
+    DEBUG = True
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+    
+    # Install debug toolbar
+    INSTALLED_APPS += ['debug_toolbar']
+    MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
+    INTERNAL_IPS = ['127.0.0.1']
+    ```
+
+    For production debugging:
+    - Use logging instead of DEBUG=True
+    - Configure Sentry or similar error tracking
+    - Use Django's logging framework
+  </Accordion>
+
+  <Accordion title="How do I set up logging?">
+    Configure in settings:
+
+    ```python
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'verbose': {
+                'format': '{levelname} {asctime} {module} {message}',
+                'style': '{',
+            },
+        },
+        'handlers': {
+            'file': {
+                'level': 'INFO',
+                'class': 'logging.FileHandler',
+                'filename': '/var/log/ralph/ralph.log',
+                'formatter': 'verbose',
+            },
+        },
+        'loggers': {
+            'ralph': {
+                'handlers': ['file'],
+                'level': 'INFO',
+                'propagate': True,
+            },
+        },
+    }
+    ```
+
+    Use in code:
+    ```python
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    logger.info('Operation completed')
+    logger.warning('Unusual condition')
+    logger.error('Error occurred', exc_info=True)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Performance and Optimization
+
+<AccordionGroup>
+  <Accordion title="How do I profile slow queries?">
+    **Using Django Debug Toolbar:**
+    ```python
+    # settings/dev.py
+    INSTALLED_APPS += ['debug_toolbar']
+    MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
+    ```
+
+    **Using query logging:**
+    ```python
+    from django.db import connection, reset_queries
+    from django.conf import settings
+    
+    settings.DEBUG = True
+    reset_queries()
+    
+    # Your code here
+    MyModel.objects.select_related('owner').all()
+    
+    print(f"Total queries: {len(connection.queries)}")
+    for query in connection.queries:
+        print(f"{query['time']}: {query['sql']}")
+    ```
+
+    **Using django-silk:**
+    ```bash
+    pip install django-silk
+    ```
+    
+    Add to settings and visit `/silk/` for profiling UI.
+  </Accordion>
+
+  <Accordion title="How do I optimize large querysets?">
+    **Use pagination:**
+    ```python
+    from django.core.paginator import Paginator
+    
+    queryset = MyModel.objects.all()
+    paginator = Paginator(queryset, 100)  # 100 per page
+    page = paginator.get_page(1)
+    ```
+
+    **Use iterator for large datasets:**
+    ```python
+    for obj in MyModel.objects.iterator(chunk_size=1000):
+        process(obj)
+    ```
+
+    **Use only() and defer():**
+    ```python
+    # Only load specific fields
+    MyModel.objects.only('id', 'name')
+    
+    # Defer large fields
+    MyModel.objects.defer('description', 'content')
+    ```
+
+    **Use values() for simple data:**
+    ```python
+    # Returns dicts instead of model instances
+    MyModel.objects.values('id', 'name', 'status')
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Need More Help?
+
+If your question isn't answered here:
+
+- Check the [Development Guide](/development/architecture)
+- Review [API Documentation](/development/api)
+- Search [GitHub Issues](https://github.com/allegro/ralph/issues)
+- Ask in Ralph community channels

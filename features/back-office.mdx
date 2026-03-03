@@ -1,0 +1,308 @@
+---
+title: Back Office Management
+description: Manage laptops, desktops, mobile devices, and accessories assigned to users with comprehensive tracking and lifecycle management
+---
+
+Back Office Management in Ralph enables you to track and manage all IT equipment assigned to employees - from laptops and mobile phones to printers and accessories.
+
+## Overview
+
+The Back Office module provides:
+
+- User equipment assignment and tracking
+- Comprehensive asset lifecycle management
+- Self-service equipment reporting
+- Warehouse and inventory management
+- Loan and return workflows
+- Stock-taking and auditing tools
+
+<CardGroup cols={2}>
+  <Card title="User Assignments" icon="user">
+    Track which equipment is assigned to each employee with full history
+  </Card>
+  
+  <Card title="Mobile Devices" icon="mobile">
+    Manage phones, tablets, and SIM cards with IMEI validation
+  </Card>
+  
+  <Card title="Accessories" icon="keyboard">
+    Track monitors, keyboards, docking stations, and peripherals
+  </Card>
+  
+  <Card title="My Equipment" icon="box">
+    Users can view and confirm their assigned equipment for stock-taking
+  </Card>
+</CardGroup>
+
+## Asset Types
+
+### Back Office Assets
+
+The primary asset type for user-assigned equipment:
+
+- **Laptops** - Mobile computing devices
+- **Desktops** - Workstations and PCs
+- **Monitors** - Displays and screens
+- **Printers** - Network and local printers
+- **Mobile Phones** - Smartphones and cellular devices
+- **Tablets** - iPads and Android tablets
+- **Accessories** - Keyboards, mice, docking stations, headsets
+
+### Asset Status
+
+Back office assets support a comprehensive range of statuses:
+
+**Active States**
+- `new` - Newly purchased, not yet deployed
+- `in use` - Actively assigned to a user
+- `in use team` - Shared team equipment
+- `in use test` - Test/QA equipment
+- `free` - Available for assignment
+- `reserved` - Reserved for specific user or project
+
+**Process States**
+- `in progress` - Being prepared for deployment
+- `loan` - Temporarily loaned to user
+- `loan in progress` - Loan being processed
+- `return in progress` - Being returned from user
+- `in service` - Under repair or maintenance
+
+**Inactive States**
+- `damaged` - Broken or non-functional
+- `liquidated` - Disposed or sold
+- `quarantine` - Quarantined for security or health reasons
+- `taken for disposal` - Marked for disposal
+
+<Note>
+Status names can include suffixes like "(mgmt excluded)" or "(update excluded)" to control which assets appear in management systems or receive automated updates.
+</Note>
+
+## User Assignment
+
+### Assigning Equipment to Users
+
+Assets can be assigned to individual users:
+
+1. **Select Asset** - Open the asset detail page
+2. **Choose User** - Select from the user directory
+3. **Set Status** - Update to "in use" or appropriate status
+4. **Add Notes** - Document assignment reason or configuration
+
+### Assignment History
+
+Ralph maintains complete assignment history:
+
+- Previous users and owners
+- Assignment dates and durations
+- Status changes over time
+- Transition reasons and notes
+
+### User Equipment View
+
+Users can access "My Equipment" to see:
+
+- All assets currently assigned to them
+- Asset details and specifications
+- Support contact information
+- Stock-taking confirmation interface
+
+## Office Infrastructure
+
+Organize back office assets by physical location:
+
+- **Office Locations** - Buildings and office sites
+- **Departments** - Organizational units
+- **Floor/Room** - Detailed physical location
+- **Assignment Tracking** - Equipment by location
+
+This helps with:
+- Physical inventory audits
+- Equipment retrieval
+- Location-based reporting
+- Site-specific policies
+
+## Warehouses
+
+### Warehouse Management
+
+Store and track assets before deployment:
+
+- **Multiple Warehouses** - Support for distributed storage
+- **Stock Levels** - Current inventory counts
+- **Stock-Taking** - Enable periodic audits
+- **External Depot ID** - Integration with external systems
+
+### Stock-Taking Process
+
+Streamline physical inventory verification:
+
+1. **Enable Stock-Taking** - Check box in warehouse admin
+2. **User Confirmation** - Users verify their equipment via "My Equipment"
+3. **Inventory Tags** - System records confirmation with timestamps
+4. **Audit Reports** - Export verification results
+5. **Disable When Complete** - Uncheck to end the process
+
+<Tip>
+Enable stock-taking per warehouse or per region to target specific groups of assets. This allows rolling audits without disrupting the entire organization.
+</Tip>
+
+## Mobile Devices
+
+### IMEI Tracking
+
+Mobile phones include specialized fields:
+
+- **IMEI** - International Mobile Equipment Identity
+- **Validation** - Automatic IMEI format validation
+- **SIM Card** - Associated SIM card tracking
+- **Carrier** - Mobile carrier information
+
+<Note>
+Ralph validates IMEI numbers against both pre-2003 and post-2003 formats to ensure data accuracy.
+</Note>
+
+## Equipment Loans
+
+### Loan Workflow
+
+Manage temporary equipment assignments:
+
+1. **Loan Request** - Create loan with start/end dates
+2. **Status Change** - Set to "loan" or "loan in progress"
+3. **User Assignment** - Assign to borrower
+4. **Return Process** - Set to "return in progress"
+5. **Completion** - Return to warehouse or reassign
+
+### Tracking
+
+- Loan duration and expected return date
+- Borrower information
+- Loan purpose and notes
+- Overdue loan alerts
+
+## Asset Models
+
+### Back Office Models
+
+When creating asset models for back office equipment:
+
+1. **Set Type** - Choose "Back Office" as model type
+2. **Category** - Select appropriate category (laptop, phone, printer, etc.)
+3. **Manufacturer** - Link to manufacturer database
+4. **Specifications** - Add technical details
+
+<Tip>
+Create models for your standard employee laptop configurations (e.g., "Developer Laptop 2024", "Sales Laptop Standard"). This makes bulk purchasing and deployment much easier.
+</Tip>
+
+## Transitions and Workflows
+
+Automate common back office processes:
+
+### Built-in Transitions
+
+- **Deploy to User** - Change status from warehouse to in use
+- **Return from User** - Return equipment to warehouse
+- **Send for Repair** - Mark as in service
+- **Loan Equipment** - Process temporary loan
+- **Liquidate** - Mark for disposal or sale
+
+### Custom Workflows
+
+Create custom transitions for your organization:
+
+- New hire equipment provisioning
+- Employee departure asset collection
+- Equipment refresh cycles
+- Repair and maintenance workflows
+
+See [Workflows & Transitions](/features/workflows) for detailed configuration.
+
+## Integration
+
+### Licenses
+
+Track software licenses assigned to back office assets:
+
+- Operating system licenses
+- Microsoft Office and productivity software
+- Development tools and IDE licenses
+- Per-device license compliance
+
+### Supports
+
+Link warranty and support contracts:
+
+- Manufacturer warranties
+- Extended support agreements
+- On-site vs. depot repair
+- Warranty expiration tracking
+
+### SIM Cards
+
+Manage SIM cards separately from mobile devices:
+
+- Carrier and plan information
+- Phone number tracking
+- Data plan limits
+- Assignment to devices
+
+### Access Cards
+
+Track physical access cards:
+
+- Badge numbers
+- Access levels and permissions
+- Assignment to users
+- Lost/stolen card tracking
+
+## Reporting
+
+### Standard Reports
+
+Generate reports for back office assets:
+
+- **Equipment by User** - All assets assigned to each employee
+- **Equipment by Location** - Assets in each office or warehouse
+- **Asset Age** - Equipment due for refresh
+- **Warranty Status** - Upcoming warranty expirations
+- **Stock-Taking Results** - Audit confirmation status
+
+### Financial Reports
+
+- Asset value by department
+- Depreciation summaries
+- Purchase history
+- Liquidation and disposal records
+
+## Best Practices
+
+<Tip>
+**Standardize Models**: Maintain a catalog of standard employee equipment configurations. This simplifies procurement, deployment, and support.
+</Tip>
+
+<Tip>
+**Document Assignments**: Always update asset status and user assignment together. This keeps your inventory accurate and makes reporting reliable.
+</Tip>
+
+<Tip>
+**Regular Stock-Taking**: Schedule periodic stock-taking exercises (quarterly or semi-annually) to maintain inventory accuracy and identify missing equipment.
+</Tip>
+
+<Note>
+Use the "My Equipment" self-service feature to reduce administrative overhead during stock-taking. Users can confirm their equipment directly, saving IT staff significant time.
+</Note>
+
+## Bulk Operations
+
+Efficiently manage multiple assets:
+
+- **Bulk Import** - Import assets from CSV or Excel
+- **Mass Assignment** - Assign multiple assets to users at once
+- **Status Changes** - Update status for multiple items
+- **Label Printing** - Generate barcode labels in batches
+- **Bulk Export** - Export filtered asset lists
+
+<Card title="Next Steps" icon="arrow-right">
+  Learn about software license management in [Licenses](/features/licenses)
+</Card>

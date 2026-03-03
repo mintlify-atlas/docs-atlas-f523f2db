@@ -1,0 +1,557 @@
+---
+title: "Architecture Overview"
+description: "Understand Ralph's Django-based architecture, module structure, and core design patterns"
+---
+
+Ralph is built on Django 4.2 and follows a modular architecture designed for managing assets, data centers, and configuration data. This guide explains the core architectural patterns and module organization.
+
+## Core Principles
+
+### Fat Models, Thin Views
+
+Ralph's architecture emphasizes business logic in Django models:
+
+- **Models** contain operational logic and data validation
+- **Django Admin** generates user interfaces automatically
+- **Views** primarily handle request/response without complex business logic
+
+This approach prioritizes simplicity and leverages Django's built-in admin capabilities for rapid development.
+
+### Modular Design
+
+Ralph is organized into self-contained Django apps, each responsible for a specific domain:
+
+```
+src/ralph/
+├── assets/              # Asset lifecycle management
+├── data_center/         # Data center infrastructure
+├── back_office/         # Office assets & equipment
+├── licences/            # Software & hardware licenses
+├── networks/            # IP address & network management
+├── dhcp/                # DHCP configuration
+├── dns/                 # DNS records
+├── domains/             # Domain registration
+├── ssl_certificates/    # SSL/TLS certificate tracking
+├── sim_cards/           # SIM card inventory
+├── access_cards/        # Physical access cards
+├── supports/            # Support contracts
+├── operations/          # Operational workflows
+├── deployment/          # Asset deployment
+├── data_importer/       # Bulk data import
+├── reports/             # Reporting engine
+└── dashboards/          # Custom dashboards
+```
+
+## Technology Stack
+
+### Backend Framework
+
+**Django 4.2** - The foundation
+- Python 3.10 required (`>=3.10.0, <3.11`)
+- Django ORM for database abstraction
+- Django Admin for UI generation
+- Django REST Framework (3.15.0) for API
+
+### Key Dependencies
+
+From `pyproject.toml`:
+
+```toml
+# Core Framework
+django~=4.2.0
+djangorestframework==3.15.0
+
+# Database Support
+mysqlclient~=2.0.1              # MySQL connector
+psycopg[binary,pool]>=3.2.10   # PostgreSQL connector
+
+# Caching & Background Jobs
+django-redis==5.0.0
+redis~=4.0
+django-rq==2.8.0
+rq==1.16.2
+
+# Data Management
+django-import-export~=4.0       # CSV/Excel import/export
+django-reversion~=4.0.2         # Model versioning
+django-mptt==0.14               # Hierarchical data
+
+# API & Serialization
+drf-nested-routers==0.92.5
+djangorestframework_xml==2.0.0
+
+# Utilities
+django-filter==25.1             # API filtering
+django-taggit                   # Tagging system
+django-money==3.4.1             # Currency support
+```
+
+### Frontend Stack
+
+- **Node.js** (v8.10.0 - v11.7.0)
+- **npm** for dependency management
+- **Gulp** for asset compilation
+- Custom JavaScript for admin enhancements
+
+### Infrastructure Services
+
+- **MySQL 5.7** or **PostgreSQL 14+** - Primary database
+- **Redis 4.0+** - Caching and job queues
+- **inkpy** - Custom background job processor
+
+## Model Architecture
+
+### BaseObject Pattern
+
+Most Ralph models inherit from `BaseObject`, which provides common functionality:
+
+```python src/ralph/assets/models/base.py
+class BaseObject(
+    Polymorphic,
+    TaggableMixin,
+    PermByFieldMixin,
+    TimeStampMixin,
+    WithCustomFieldsMixin,
+    models.Model,
+    metaclass=BaseObjectMeta,
+):
+    """Base object mixin."""
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        related_name="children",
+        on_delete=models.SET_NULL,
+    )
+    remarks = models.TextField(blank=True)
+    service_env = models.ForeignKey(
+        "ServiceEnvironment", 
+        null=True, 
+        blank=True, 
+        on_delete=models.PROTECT
+    )
+    configuration_path = models.ForeignKey(
+        "ConfigurationClass",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
+    )
+    attachments = GenericRelation(AttachmentItem)
+```
+
+### Key Mixins
+
+| Mixin | Purpose | Provides |
+|-------|---------|----------|
+| `Polymorphic` | Model inheritance | Content type tracking, polymorphic queries |
+| `TaggableMixin` | Tagging support | Tag field and manager |
+| `PermByFieldMixin` | Field-level permissions | Granular access control |
+| `TimeStampMixin` | Automatic timestamps | `created`, `modified` fields |
+| `WithCustomFieldsMixin` | Custom fields | User-defined fields per model |
+| `TransitionWorkflowBase` | State machines | Workflow transitions |
+
+### Polymorphic Models
+
+Ralph uses polymorphic inheritance for asset types:
+
+```python
+# All these inherit from BaseObject
+DataCenterAsset    # Physical servers, network devices
+BackOfficeAsset    # Laptops, monitors, peripherals
+CloudHost          # Cloud instances
+VirtualServer      # Virtual machines
+```
+
+This allows:
+- Unified queries across asset types
+- Type-specific fields and methods
+- Shared relationships (e.g., licenses, supports)
+
+## Module Structure
+
+Each Django app follows a consistent structure:
+
+```
+assets/
+├── __init__.py
+├── apps.py              # App configuration
+├── models/              # Domain models (split by concern)
+│   ├── __init__.py
+│   ├── base.py          # BaseObject and mixins
+│   ├── assets.py        # Asset-specific models
+│   ├── components.py    # Hardware components
+│   └── configuration.py # Configuration management
+├── admin.py             # Django admin configuration
+├── api/                 # REST API endpoints
+│   ├── serializers.py   # API serializers
+│   └── views.py         # API viewsets
+├── forms.py             # Custom forms
+├── filters.py           # Query filters
+├── views.py             # Web views
+├── signals.py           # Signal handlers
+├── subscribers.py       # Event subscribers
+├── migrations/          # Database migrations
+├── templates/           # HTML templates
+└── tests/               # Unit and integration tests
+```
+
+## API Architecture
+
+### Django REST Framework
+
+Ralph exposes a comprehensive REST API:
+
+```python
+# Typical API endpoint structure
+from rest_framework import viewsets
+from ralph.lib.mixins.api import (
+    ChoiceFieldWithFullInfoSerializer,
+    PermissionsForObjectMixin,
+)
+
+class DataCenterAssetViewSet(
+    PermissionsForObjectMixin,
+    viewsets.ModelViewSet
+):
+    queryset = DataCenterAsset.objects.all()
+    serializer_class = DataCenterAssetSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_class = DataCenterAssetFilter
+```
+
+### Nested Routers
+
+Related resources use nested routing:
+
+```
+/api/data-center-assets/
+/api/data-center-assets/{id}/
+/api/data-center-assets/{id}/components/
+/api/data-center-assets/{id}/licenses/
+```
+
+## Workflow System
+
+### Transitions
+
+Ralph implements state machine workflows for asset lifecycle:
+
+```python
+from ralph.lib.transitions.decorators import transition_action
+from ralph.lib.transitions.models import Transition
+
+class Asset(BaseObject):
+    status = models.CharField(choices=AssetStatus.choices)
+    
+    @transition_action(
+        form_fields={'remarks': {'required': True}}
+    )
+    def deploy(self, **kwargs):
+        """Transition from 'new' to 'deployed'"""
+        self.status = AssetStatus.DEPLOYED
+        self.save()
+```
+
+Transitions support:
+- Custom validation
+- Dynamic forms
+- Audit logging
+- Email notifications
+
+## Data Import/Export
+
+### Import Engine
+
+The `data_importer` module provides:
+- CSV/Excel file parsing
+- Field mapping
+- Validation and error reporting
+- Bulk create/update operations
+
+### Export Formats
+
+Using `django-import-export`:
+- CSV
+- Excel (XLSX)
+- ODF (Open Document Format)
+- JSON
+- XML
+
+## Permission System
+
+### Field-Level Permissions
+
+Ralph supports granular permissions:
+
+```python
+class DataCenterAsset(BaseObject):
+    class Meta:
+        permissions = [
+            ('view_datacenterasset', 'Can view data center asset'),
+            ('change_datacenterasset', 'Can change data center asset'),
+        ]
+```
+
+### Permission Mixins
+
+- `PermissionsForObjectMixin` - Object-level API permissions
+- `PermByFieldMixin` - Field-level read/write control
+
+## Background Jobs
+
+### Django RQ
+
+Ralph uses Redis Queue for asynchronous tasks:
+
+```python
+from django_rq import job
+
+@job
+def process_network_scan(scan_id):
+    """Background task for network discovery"""
+    scan = NetworkScan.objects.get(id=scan_id)
+    scan.execute()
+```
+
+### inkpy Service
+
+The `inkpy` container runs background workers:
+- Network discovery jobs
+- Report generation
+- Data synchronization
+- Email notifications
+
+## Configuration Management
+
+### Settings Structure
+
+```
+settings/
+├── __init__.py
+├── base.py          # Common settings
+├── dev.py           # Development overrides
+├── test.py          # Testing configuration
+├── prod.py          # Production settings
+└── local.template   # Local development template
+```
+
+### Environment-Based Configuration
+
+Settings support environment variables:
+
+```python src/ralph/settings/local.template
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("DATABASE_NAME", "ralph_ng"),
+        "USER": os.environ.get("DATABASE_USER", "ralph_ng"),
+        "PASSWORD": os.environ.get("DATABASE_PASSWORD", "ralph_ng"),
+        "HOST": os.environ.get("DATABASE_HOST", "127.0.0.1"),
+    }
+}
+```
+
+## Main Application Modules
+
+### Assets Module
+
+Manages physical and virtual assets:
+- Asset lifecycle tracking
+- Component management
+- Purchase orders
+- Depreciation calculations
+- Asset assignment to users
+
+### Data Center Module
+
+Data center infrastructure management:
+- Racks and rack units
+- Network devices
+- Servers and hardware
+- Power and network connections
+- DC visualization
+
+### Networks Module
+
+IP address and network management:
+- IP address allocation
+- Network ranges
+- DNS records
+- DHCP configuration
+
+### Licenses Module
+
+Software and hardware license tracking:
+- License assignment
+- Expiration monitoring
+- Compliance reporting
+
+## Database Design
+
+### Supported Databases
+
+- **MySQL 5.7** - Default, widely tested
+- **PostgreSQL 14+** - Alternative, full feature support
+
+### Character Sets
+
+MySQL configuration requires UTF-8:
+```
+mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+```
+
+### Migrations
+
+Django migrations are stored per-app:
+```
+ralph/assets/migrations/
+ralph/data_center/migrations/
+```
+
+Run migrations:
+```bash
+ralph migrate
+```
+
+## Testing Architecture
+
+### Test Organization
+
+Tests are organized by module:
+```
+assets/tests/
+├── __init__.py
+├── test_models.py
+├── test_api.py
+├── test_admin.py
+└── factories.py
+```
+
+### Test Dependencies
+
+From `pyproject.toml`:
+```toml
+[dependency-groups]
+test = [
+  "coverage",
+  "ddt",                          # Data-driven tests
+  "factory-boy==3.2.1",           # Test fixtures
+  "mock==4.0.2",
+]
+```
+
+### Running Tests
+
+```bash
+# All tests
+test_ralph test
+
+# Specific app
+test_ralph test ralph.assets
+
+# With coverage
+coverage run $(which test_ralph) test
+coverage report
+```
+
+## Development Tools
+
+### Debugging
+
+Development dependencies include:
+- **django-debug-toolbar** - SQL query analysis
+- **django-silk** - Performance profiling
+- **ipdb** - Interactive debugger
+- **ipython** - Enhanced Python shell
+
+### Code Quality
+
+- **ruff** - Fast Python linter (replaces flake8)
+- **toml-sort** - TOML file formatting
+
+```bash
+# Run linter
+make checks
+
+# Or directly
+ruff check src
+```
+
+## Extension Points
+
+### Custom Fields
+
+Add user-defined fields to any model:
+```python
+from ralph.lib.custom_fields.models import WithCustomFieldsMixin
+
+class MyModel(WithCustomFieldsMixin, models.Model):
+    # Custom fields are automatically available
+    pass
+```
+
+### Hooks System
+
+Extend functionality using Django signals:
+```python
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=DataCenterAsset)
+def on_asset_saved(sender, instance, created, **kwargs):
+    if created:
+        # Custom logic on asset creation
+        pass
+```
+
+### Admin Customization
+
+Extend Django admin:
+```python
+from ralph.admin import RalphAdmin
+
+class CustomAssetAdmin(RalphAdmin):
+    list_display = ['name', 'barcode', 'status']
+    list_filter = ['status', 'service_env']
+    search_fields = ['barcode', 'sn']
+```
+
+## Performance Considerations
+
+### Caching Strategy
+
+- **Redis** for session storage
+- Query result caching for expensive operations
+- Static file caching via nginx
+
+### Query Optimization
+
+- Use `select_related()` for foreign keys
+- Use `prefetch_related()` for many-to-many
+- Index frequently queried fields
+
+### Database Connection Pooling
+
+PostgreSQL uses connection pooling:
+```python
+"OPTIONS": {
+    "pool": True,  # psycopg3 pooling
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Setup Guide" icon="laptop-code" href="/development/setup">
+    Set up your development environment
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Explore the REST API
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="/contributing">
+    Learn how to contribute
+  </Card>
+  <Card title="Custom Fields" icon="input-text" href="/guides/custom-fields">
+    Extend models with custom fields
+  </Card>
+</CardGroup>
