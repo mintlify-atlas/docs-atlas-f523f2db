@@ -1,0 +1,145 @@
+{
+  "projectType": "saas",
+  "projectName": "Ralph",
+  "projectDescription": "Asset Management, DCIM and CMDB system for data centers and back offices.",
+  "theme": "linden",
+  "primaryColor": "#03A9F4",
+  "lightColor": "#4FC3F7",
+  "darkColor": "#0288D1",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Installation",
+            "pages": [
+              "installation/overview",
+              "installation/ubuntu",
+              "installation/docker",
+              "installation/configuration",
+              "installation/migration"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/asset-management",
+              "features/data-center",
+              "features/back-office",
+              "features/licenses",
+              "features/supports",
+              "features/workflows"
+            ]
+          },
+          {
+            "group": "User Guide",
+            "pages": [
+              "user-guide/dcim",
+              "user-guide/dc-visualization",
+              "user-guide/dashboards",
+              "user-guide/custom-fields",
+              "user-guide/domains",
+              "user-guide/deployment",
+              "user-guide/cloud-sync",
+              "user-guide/stock-taking"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/api",
+              "integrations/ralph-cli",
+              "integrations/configuration-management"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developer Guide",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "development/setup",
+              "development/docker-environment",
+              "development/architecture"
+            ]
+          },
+          {
+            "group": "Extending Ralph",
+            "pages": [
+              "development/admin",
+              "development/custom-fields",
+              "development/transitions",
+              "development/addons"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "development/api",
+              "development/packaging",
+              "development/maintainer-tools",
+              "development/faq"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "development/contributing"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Asset lifecycle management for data center and back office hardware",
+    "Data center visualization with rack layout and server room management",
+    "Configuration Management Database (CMDB) integration",
+    "Software and hardware license tracking",
+    "Vendor support and contract management",
+    "Flexible workflow system with custom transitions",
+    "RESTful API with Django Rest Framework",
+    "Custom fields and extensible data model",
+    "Integration with configuration management tools (Puppet, Ansible)",
+    "Cloud resource synchronization",
+    "Dashboards and reporting",
+    "Domain and DNS management"
+  ],
+  "publicApiSurface": [
+    "POST /api-token-auth/ - Authenticate and get API token",
+    "GET /api/ - API root and resource discovery",
+    "GET /api/data-center-assets/ - List data center assets",
+    "POST /api/data-center-assets/ - Create data center asset",
+    "GET /api/data-center-assets/{id}/ - Get asset details",
+    "PATCH /api/data-center-assets/{id}/ - Update asset",
+    "DELETE /api/data-center-assets/{id}/ - Delete asset",
+    "GET /api/back-office-assets/ - List back office assets",
+    "GET /api/racks/ - List racks",
+    "GET /api/server-rooms/ - List server rooms",
+    "GET /api/data-centers/ - List data centers",
+    "GET /api/services/ - List services",
+    "GET /api/service-environments/ - List service environments",
+    "GET /api/licences/ - List licenses",
+    "GET /api/supports/ - List support contracts",
+    "GET /api/asset-models/ - List asset models",
+    "GET /api/manufacturers/ - List manufacturers",
+    "GET /api/virtual-servers/ - List virtual servers",
+    "GET /api/cloud-hosts/ - List cloud hosts",
+    "GET /api/domains/ - List domains",
+    "GET /api/{model}/{id}/transitions/ - List available transitions",
+    "POST /api/{model}/{id}/transitions/{transition}/ - Execute transition",
+    "ralph - Main CLI command (Django management commands)",
+    "dev_ralph - Development server",
+    "validate_ralph - Cross-validation tool"
+  ]
+}
