@@ -360,25 +360,61 @@ curl -X POST \
 
 Ralph exposes the following resource endpoints:
 
+### Assets & Inventory
 - `/api/data-center-assets/` - Data center assets
 - `/api/back-office-assets/` - Back office assets
 - `/api/base-objects/` - All assets (polymorphic)
+- `/api/asset-models/` - Hardware models
+- `/api/manufacturers/` - Hardware manufacturers
+- `/api/categories/` - Asset categories
+- `/api/warehouses/` - Warehouses
+
+### Data Center Infrastructure
 - `/api/racks/` - Server racks
 - `/api/server-rooms/` - Server rooms
 - `/api/data-centers/` - Data centers
-- `/api/asset-models/` - Hardware models
-- `/api/manufacturers/` - Hardware manufacturers
+- `/api/accessories/` - Rack accessories
+- `/api/access-cards/` - Physical access cards
+- `/api/access-zones/` - Access control zones
+
+### Services & Environments
 - `/api/services/` - Business services
 - `/api/service-environments/` - Service environments
 - `/api/environments/` - Environments (prod, test, etc.)
 - `/api/configuration-modules/` - Configuration modules
 - `/api/configuration-classes/` - Configuration classes
+
+### Virtual & Cloud
 - `/api/virtual-servers/` - Virtual machines
 - `/api/cloud-hosts/` - Cloud instances
+- `/api/clusters/` - Virtualization clusters
+
+### Networking
 - `/api/networks/` - IP networks
 - `/api/ip-addresses/` - IP addresses
+- `/api/network-environments/` - Network environments
+
+### Licenses & Support
+- `/api/licences/` - Software licenses
+- `/api/software/` - Software catalog
+- `/api/supports/` - Support contracts
+- `/api/base-object-licences/` - Asset-license assignments
+
+### Telephony
+- `/api/sim-cards/` - SIM cards
+
+### Security
+- `/api/ssl-certificates/` - SSL/TLS certificates
+
+### Domains
+- `/api/domains/` - Domain registrations
+- `/api/domain-contracts/` - Domain contracts
+
+### User Management
 - `/api/users/` - Users
 - `/api/groups/` - Groups
+- `/api/regions/` - Regional divisions
+- `/api/teams/` - Support teams
 
 <Note>
 Visit `https://<YOUR-RALPH-URL>/api/` in your browser for an interactive list of all available endpoints and to explore the API.
